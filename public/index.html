@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>INNOVATION TECH Dashboard</title>
+  <meta name="viewport" content="initial-scale=1, width=device-width" />
+  <!-- Fonts to support Material Design -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" />
+  <!-- Icons to support Material Design -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+</head>
+
+<body>
+  <div id="root"></div>
+  <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+  <style>
+    :root {
+      --chat--color--primary: #046bb0;
+      /* --chat--color-primary-shade-50: #3d95e2; */
+      --chat--toggle--hover--background: #5498cc;
+      --chat--toggle--active--background: #367db3;
+      /* --chat--toggle--background: #367db3; */
+    }
+
+    #n8n-chat .chat-input-send-button {
+      transition: all 0.3s ease;
+      /* background-color: #d3d3d3; */
+      color: #888;
+      cursor: not-allowed;
+      pointer-events: none;
+      /* border-radius: 999px; */
+    }
+
+    #n8n-chat .chat-input-send-button.active {
+      background-color: #005ea6;
+      color: white;
+      cursor: pointer;
+      pointer-events: auto;
+      border-radius: 999px;
+    }
+  </style>
+  <div id="n8n-chat"></div>
+  <script type="module">
+    import { createChat } from "https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js";
+    createChat({
+      webhookUrl:
+        "https://alsaboor.app.n8n.cloud/webhook/51d62240-8c0d-427f-8864-7f3e6427ca36/chat",
+      webhookConfig: {
+        method: "POST",
+        headers: {},
+      },
+      target: "#n8n-chat",
+      mode: "window",
+      chatInputKey: "chatInput",
+      chatSessionKey: "sessionId",
+      loadPreviousSession: true,
+      metadata: {},
+      showWelcomeScreen: false,
+      defaultLanguage: "en",
+      initialMessages: [
+        "Hi there!!",
+        "Welcome to INNOVATION TECH Travels — Bringing you reliable flight bookings, Hajj & Umrah packages, and travel solutions with care and expertise. How can I help you today?",
+      ],
+      i18n: {
+        en: {
+          title: "Hi there!!",
+          subtitle:
+            "I’m INNOVATION TECH Assistant — your virtual travel agent for flight bookings, ticket inquiries, and travel support.",
+          footer: "",
+          getStarted: "New Conversation",
+          inputPlaceholder: "Type your question..",
+        },
+      },
+    });
+
+    const observer = new MutationObserver(() => {
+      const input = document.querySelector("#n8n-chat textarea");
+      const sendBtn = document.querySelector(
+        "#n8n-chat button.chat-input-send-button"
+      );
+
+      if (!input || !sendBtn) return;
+
+      sendBtn.classList.remove("active");
+
+      input.oninput = null;
+
+      input.addEventListener("input", () => {
+        if (input.value.trim() === "") {
+          sendBtn.classList.remove("active");
+        } else {
+          sendBtn.classList.add("active");
+        }
+      });
+    });
+
+    observer.observe(document.querySelector("#n8n-chat"), {
+      childList: true,
+      subtree: true,
+    });
+  </script>
+</body>
+
+</html>

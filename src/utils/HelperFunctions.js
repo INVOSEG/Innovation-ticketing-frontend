@@ -411,10 +411,10 @@ export function calculateTotalFlightTime(flightSegments) {
 
 export function extractTrips(flightSegments, trips, apiName = 'wego') {
     const getFrom = seg =>
-        apiName.startsWith('amad') ? seg.departureLocation : seg.departure.airport;
+        (apiName.startsWith('amad') || apiName === 'hitit') ? seg.departureLocation : seg.departure.airport;
 
     const getTo = seg =>
-        apiName.startsWith('amad') ? seg.arrivalLocation : seg?.arrival?.airport;
+        (apiName.startsWith('amad') || apiName === 'hitit') ? seg.arrivalLocation : seg?.arrival?.airport;
 
     const result = [];
     let startIdx = 0;
@@ -458,10 +458,10 @@ export function extractTrips(flightSegments, trips, apiName = 'wego') {
 
 export function extractTripsForMultiCity(flightSegments, trips, apiName = 'wego') {
     const getFrom = seg =>
-        apiName.startsWith('amad') ? seg?.departureLocation : seg?.airport ? seg?.airport : seg?.departure?.airport;
+        (apiName.startsWith('amad') || apiName === 'hitit') ? seg?.departureLocation : seg?.airport ? seg?.airport : seg?.departure?.airport;
 
     const getTo = seg =>
-        apiName.startsWith('amad') ? seg?.arrivalLocation : seg?.airport ? seg?.airport : seg?.arrival?.airport;
+        (apiName.startsWith('amad') || apiName === 'hitit') ? seg?.arrivalLocation : seg?.airport ? seg?.airport : seg?.arrival?.airport;
 
     const result = [];
     let startIdx = 0;

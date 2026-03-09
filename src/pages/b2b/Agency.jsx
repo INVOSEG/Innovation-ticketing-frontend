@@ -135,7 +135,7 @@ const Agency = () => {
                             <Box sx={{ height: "80px", width: "80px", borderRadius: "50px", display: "flex", justifyContent: "center", alignContent: "center", backgroundColor: "white" }}>
                             </Box>
                             <Box>
-                                <Typography sx={{ fontSize: "26px", fontWeight: "600", color: "white" }}>INNOVATION TECH TRAVEL</Typography>
+                                <Typography sx={{ fontSize: "26px", fontWeight: "600", color: "white" }}>Al-Saboor TRAVEL</Typography>
                                 <Typography sx={{ fontSize: "16px", color: "white" }}>Agent Code: 00663</Typography>
 
                             </Box>

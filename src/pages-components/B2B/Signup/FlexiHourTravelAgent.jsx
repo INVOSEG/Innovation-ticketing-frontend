@@ -61,7 +61,7 @@ const FlexiHourTravelAgent = () => {
             Whether you are a housemaker or someone looking for a side income –
             becoming a travel agent can be started from a small office or even
             from the comfort of your home with all the training and support
-            provided by INNOVATION TECH.
+            provided by Al-Saboor.
           </Typography>
         </Box>
         <Box
@@ -164,7 +164,7 @@ const FlexiHourTravelAgent = () => {
             Are you eager to join the modern and dynamic travel industry and
             dream of earning great commission? If yes, then join us today and
             become a professional travel agent. Don't worry if you don't know
-            what it takes to become a professional travel agent. INNOVATION TECH
+            what it takes to become a professional travel agent. Al-Saboor
             will provide you with the required support.
           </Typography>
         </Box>

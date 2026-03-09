@@ -151,7 +151,7 @@ export default function UserManagement() {
         variant: "success",
       });
       dispatch(setLoading(false));
-      fetchAgencyUsers()
+      fetchAgencies()
     }).catch((err) => {
       console.log(err)
       enqueueSnackbar(err || "Cannot delete staff!", {
@@ -340,24 +340,29 @@ export default function UserManagement() {
       userCnic,
       userEmail,
       userName,
-      role: stateRole,
+      role,
       password,
-      selectedAgency: stateSelectedAgency,
+      selectedAgency,
       phone,
       assignedSPO
     } = userManagement;
-
-    const role = stateRole || (usersRoles[0]?.name ? (usersRoles[0].name === "SPO" ? "SPO" : usersRoles[0].name.toLowerCase()) : "");
-    const selectedAgency = stateSelectedAgency || (allAgencies[0]?._id ? allAgencies[0]._id : "");
-
     console.log(
       "we are checking all ",
       userCnic,
       userEmail,
       userName,
-      role,
+      allAgencies[0]?._id,
+      usersRoles[0]?.name?.toLowerCase(),
       password
     );
+    // Validate email
+    // if (
+    //   !userEmail ||
+    //   !/^[\w-\.]+@(gmail\.com|[\w-]+\.asaam\.pk)$/.test(userEmail)
+    // ) {
+    //   enqueueSnackbar("Please enter a valid email address.");
+    //   return;
+    // }
 
     // Validate CNIC
     if (!userCnic || !/^\d{13}$/.test(userCnic)) {
@@ -365,21 +370,21 @@ export default function UserManagement() {
       return;
     }
 
-    // Validate Password
+    // Validate CNIC
     if (!password || !passwordRegex.test(password)) {
       enqueueSnackbar("Please enter a valid password.");
       return;
     }
 
     // Check for role
-    if (!role) {
-      enqueueSnackbar("Please enter staff role");
-      return;
-    }
-    if (!selectedAgency && !userData?.agency_id) {
-      enqueueSnackbar("Please select agency");
-      return;
-    }
+    // if (!role) {
+    //   enqueueSnackbar("Please enter staff role");
+    //   return;
+    // }
+    // if (!selectedAgency) {
+    //   enqueueSnackbar("Please select agency");
+    //   return;
+    // }
 
     // Validate user name length
     if (!userName) {
@@ -398,8 +403,8 @@ export default function UserManagement() {
       email: userEmail,
       CNIC: userCnic,
       password,
-      role: role === "SPO" ? role : role?.toLowerCase(),
-      agencyId: selectedAgency || userData?.agency_id,
+      role: role || usersRoles[0]?.name?.toLowerCase(),
+      agencyId: selectedAgency || allAgencies[0]?._id,
       phone: phone?.replace(/\s+/g, ""),
       assignedSPO,
       agencyName: userManagement.agencyName,
@@ -484,7 +489,7 @@ export default function UserManagement() {
     dispatch(setLoading(true))
 
     const body = {
-      firstName: editStaff.userName || editStaff.firstName,
+      firstName: editStaff.userName,
       email: editStaff?.email,
       role: editStaff?.role === "SPO" ? editStaff?.role : editStaff?.role?.toLowerCase(),
       CNIC: editStaff?.userCnic || editStaff?.CNIC,

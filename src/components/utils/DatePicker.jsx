@@ -14,6 +14,10 @@ const DatePicker = ({ isOpen, onClose, onDateSelect, selectedDate, title, icon, 
   const datePickerRef = useRef(null);
 
   useEffect(() => {
+    setCurrentDate(selectedDate);
+  }, [selectedDate]);
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
         onClose();
@@ -53,7 +57,7 @@ const DatePicker = ({ isOpen, onClose, onDateSelect, selectedDate, title, icon, 
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <AppDatePicker
-          value={currentDate}
+          date={currentDate}
           handleChange={handleDateChange}
           datePickerRef={datePickerRef}
           openDatePicker={openDatePicker}

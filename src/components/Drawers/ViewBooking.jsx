@@ -40,21 +40,27 @@ const Header = ({ setState }) => {
     )
 }
 
-const FlightTab = ({ flight, isAmadus }) => {
+const FlightTab = ({ flight, isAmadus, isHitit }) => {
     console.log(flight)
     return (
         <>
-            {flight ? flight?.map((item, index) => (
-                <Box key={index} sx={{ border: '1px solid black', borderRadius: '20px', marginTop: index !== 0 && '10px' }}>
+            {flight && flight.length > 0 ? flight?.map((item, index) => (
+                <Box key={index} sx={{ border: '1px solid black', borderRadius: '20px', marginTop: index !== 0 && '10px', padding: '10px' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                         <Box>
-                            <Typography level="h4">{isAmadus ? item?.departure?.iataCode : item?.fromAirportCode}</Typography>
-                            <Typography sx={{fontSize: '11px'}}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.name}</Typography>
-                            <Typography sx={{fontSize: '11px'}}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.city}</Typography>
-                            <Typography sx={{fontSize: '11px'}}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.country}</Typography>
-
-
-                            <Typography level="title-sm" color="neutral" sx={{mt:2}}>{isAmadus ? formatDateOrTime(item?.departure?.at, "date") : item?.departureDate}</Typography>
+                            <Typography level="h4">
+                                {isHitit ? item?.departureLocation : isAmadus ? item?.departure?.iataCode : item?.fromAirportCode}
+                            </Typography>
+                            {!isHitit && (
+                                <>
+                                    <Typography sx={{ fontSize: '11px' }}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.name}</Typography>
+                                    <Typography sx={{ fontSize: '11px' }}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.city}</Typography>
+                                    <Typography sx={{ fontSize: '11px' }}>{isAmadus ? item?.departure?.iataCode : item?.fromAirport?.country}</Typography>
+                                </>
+                            )}
+                            <Typography level="title-sm" color="neutral" sx={{ mt: 2 }}>
+                                {isHitit ? item?.departureTime?.split('T')?.[0] : isAmadus ? formatDateOrTime(item?.departure?.at, "date") : item?.departureDate}
+                            </Typography>
                         </Box>
 
                         <Box>
@@ -62,18 +68,27 @@ const FlightTab = ({ flight, isAmadus }) => {
                         </Box>
 
                         <Box>
-                            <Typography level="h4" sx={{ textAlign: 'right' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirportCode}</Typography>
-                             <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.name}</Typography>
-                            <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.city}</Typography>
-                            <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.country}</Typography>
-
-                            <Typography level="title-sm" color="neutral" sx={{ textAlign: 'right', mt:2}}>{isAmadus ? formatDateOrTime(item?.arrival?.at, "date") : item?.arrivalDate}</Typography>
+                            <Typography level="h4" sx={{ textAlign: 'right' }}>
+                                {isHitit ? item?.arrivalLocation : isAmadus ? item?.arrival?.iataCode : item?.toAirportCode}
+                            </Typography>
+                            {!isHitit && (
+                                <>
+                                    <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.name}</Typography>
+                                    <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.city}</Typography>
+                                    <Typography level="body1" sx={{ textAlign: 'right', fontSize: '11px' }}>{isAmadus ? item?.arrival?.iataCode : item?.toAirport?.country}</Typography>
+                                </>
+                            )}
+                            <Typography level="title-sm" color="neutral" sx={{ textAlign: 'right', mt: 2 }}>
+                                {isHitit ? item?.arrivalTime?.split('T')?.[0] : isAmadus ? formatDateOrTime(item?.arrival?.at, "date") : item?.arrivalDate}
+                            </Typography>
                         </Box>
                     </Box>
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                         <Box>
-                            <Typography level="h3">{isAmadus ? formatDateOrTime(item?.departure?.at, "time") : item?.departureTime}</Typography>
+                            <Typography level="h3">
+                                {isHitit ? item?.departureTime?.split('T')?.[1]?.substring(0, 5) : isAmadus ? formatDateOrTime(item?.departure?.at, "time") : item?.departureTime}
+                            </Typography>
                         </Box>
 
                         {/* <Box>
@@ -81,22 +96,40 @@ const FlightTab = ({ flight, isAmadus }) => {
                         </Box> */}
 
                         <Box>
-                            <Typography level="h3" sx={{ textAlign: 'right' }}>{isAmadus ? formatDateOrTime(item?.arrival?.at, "time") : item?.arrivalTime}</Typography>
+                            <Typography level="h3" sx={{ textAlign: 'right' }}>
+                                {isHitit ? item?.arrivalTime?.split('T')?.[1]?.substring(0, 5) : isAmadus ? formatDateOrTime(item?.arrival?.at, "time") : item?.arrivalTime}
+                            </Typography>
                         </Box>
                     </Box>
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                         <Box>
                             <Typography level="title-sm">Airline</Typography>
-                            <Typography level="title-lg">{isAmadus ? item?.carrierCode : item?.airlineName}</Typography>
+                            <Typography level="title-lg">
+                                {isHitit ? item?.marketingCarrier : isAmadus ? item?.carrierCode : item?.airlineName}
+                            </Typography>
                         </Box>
 
                         <Box>
-
                             <Typography level="title-sm" sx={{ textAlign: 'right' }}>Flight Number</Typography>
-                            <Typography level="title-lg" sx={{ textAlign: 'right' }}>{isAmadus ? item?.carrierCode : item?.airlineCode}-{isAmadus ? item?.number : item?.flightNumber}</Typography>
+                            <Typography level="title-lg" sx={{ textAlign: 'right' }}>
+                                {isHitit
+                                    ? `${item?.marketingCarrier}-${item?.marketingFlightNumber}`
+                                    : isAmadus
+                                        ? `${item?.carrierCode}-${item?.number}`
+                                        : `${item?.airlineCode}-${item?.flightNumber}`}
+                            </Typography>
                         </Box>
                     </Box>
+
+                    {isHitit && item?.cabin?.name && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
+                            <Box>
+                                <Typography level="title-sm">Cabin Class</Typography>
+                                <Typography level="title-lg">{item?.cabin?.name}</Typography>
+                            </Box>
+                        </Box>
+                    )}
 
 
                     {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
@@ -134,7 +167,7 @@ const FlightTab = ({ flight, isAmadus }) => {
     )
 }
 
-const TravelerDetail = ({ travelers, isAmadus }) => {
+const TravelerDetail = ({ travelers, isAmadus, isHitit }) => {
     return (
         <Box
             sx={{
@@ -146,7 +179,14 @@ const TravelerDetail = ({ travelers, isAmadus }) => {
             {travelers ? travelers.map((traveler, index) => (
                 <Card key={index} variant="outlined">
                     <CardContent>
-                        <Typography level="title-lg">{isAmadus ? traveler?.name?.firstName : removeLastWord(traveler.givenName)} {isAmadus ? traveler?.name?.lastName : traveler.surname}</Typography>
+                        <Typography level="title-lg">
+                            {isAmadus
+                                ? `${traveler?.name?.firstName || ""} ${traveler?.name?.lastName || ""}`.trim()
+                                : isHitit
+                                    ? (traveler.givenName || "")
+                                    : `${removeLastWord(traveler.givenName || "")} ${traveler.surname || ""}`.trim()
+                            }
+                        </Typography>
                         <Chip
                             size="sm"
                             variant="soft"
@@ -189,34 +229,50 @@ export default function ViewBooking({ state, setState, toggleDrawer, api, id }) 
 
     const viewFlightDetail = () => {
         setIsLoading(true); // Start loading indicator
+        setResData(null);   // Clear previous data
+
+        const urlParam = (api === "amadeus" || api === "amadus") ? "flights" : api;
+        console.log("[ViewBooking] Calling viewItinary with id:", id, "url:", urlParam, "api:", api);
 
         // Make the API call
-        viewItinary(id, (api === "amadeus" || api === "amadus") ? "flights" : api)
+        viewItinary(id, urlParam)
             .then((res) => {
-                if (res?.status === "fail") {
-                    // If the response has a status 'fail', handle it accordingly
-                    console.error("Error:", res.message);
-                    setResData(null);  // Clear previous data or set it as appropriate
+                console.log("[ViewBooking] Full API response:", res);
+                console.log("[ViewBooking] res.body:", res?.body);
+                console.log("[ViewBooking] res.status:", res?.status, "res.code:", res?.code);
+
+                const isFail = res?.status === "fail" || (res?.code && res.code >= 400);
+                if (isFail) {
+                    console.error("[ViewBooking] Error response:", res);
+                    setResData(null);
                 } else {
-                    // Handle success case
-                    console.log(res?.result);
-                    setResData((api === "amadeus" || api === "amadus") ? res?.result?.data : res?.result?.data);  // Set response data
+                    if (api?.toLowerCase() === "hitit") {
+                        // Hitit returns { code:200, message:"...", body: { departure:[...], ... } }
+                        const hitData = res?.body || res?.result || res;
+                        console.log("[ViewBooking] Hitit data:", hitData);
+                        setResData(hitData);
+                    } else {
+                        const data = res?.result?.data || res?.result || null;
+                        console.log("[ViewBooking] Non-hitit data:", data);
+                        setResData(data);
+                    }
                 }
             })
             .catch((error) => {
-                // Handle network or other unexpected errors
-                console.error("API call failed:", error);
-                setResData(null);  // Handle error appropriately
+                console.error("[ViewBooking] API call failed:", error);
+                setResData(null);
             })
             .finally(() => {
-                setIsLoading(false); // Stop loading indicator
+                setIsLoading(false);
             });
     };
 
 
     React.useEffect(() => {
-        viewFlightDetail()
-    }, [])
+        if (id) {
+            viewFlightDetail();
+        }
+    }, [id, api])
 
     return (
         <React.Fragment>
@@ -247,10 +303,20 @@ export default function ViewBooking({ state, setState, toggleDrawer, api, id }) 
                             <Tab>Traveler</Tab>
                         </TabList>
                         <TabPanel value={0}>
-                            <FlightTab {...{ flight: resData?.type === "flight-order" ? resData?.flightOffers[0]?.itineraries?.[0]?.segments : resData?.flights, isAmadus: resData?.type === "flight-order" }} />
+                            <FlightTab
+                                flight={
+                                    api?.toLowerCase() === 'hitit'
+                                        ? (resData?.departure?.length > 0 ? resData?.departure : null)
+                                        : resData?.type === "flight-order"
+                                            ? resData?.flightOffers[0]?.itineraries?.[0]?.segments
+                                            : resData?.flights
+                                }
+                                isAmadus={resData?.type === "flight-order"}
+                                isHitit={api?.toLowerCase() === 'hitit'}
+                            />
                         </TabPanel>
                         <TabPanel value={1}>
-                            <TravelerDetail {...{ travelers: resData?.travelers, isAmadus: resData?.type === "flight-order" }} />
+                            <TravelerDetail {...{ travelers: resData?.travelers, isAmadus: resData?.type === "flight-order", isHitit: api?.toLowerCase() === "hitit" }} />
                         </TabPanel>
                     </Tabs>
                 )}

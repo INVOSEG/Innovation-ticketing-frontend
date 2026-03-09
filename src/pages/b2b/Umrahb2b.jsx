@@ -62,7 +62,7 @@ const featureList = [
 const badgeStyle = {
   display: 'inline-block',
   background: '#ede9fe', // light purple
-  color: '#185ea5', // INNOVATION TECH purple
+  color: '#185ea5', // Al-Saboor purple
   fontWeight: 700,
   fontSize: 14,
   borderRadius: 16,

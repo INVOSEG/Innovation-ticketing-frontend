@@ -6,7 +6,7 @@ import { copyToClipboard, truncateString } from '../../utils/HelperFunctions';
 import { useSnackbar } from 'notistack';
 import { useDispatch, useSelector } from 'react-redux';
 import { setLoading } from '../../redux/reducer/loaderSlice';
-import { cancelBooking, getAllBookings, issueTicket, refundFlight, resendOtp, viewItinary, viewItinaryWithLogos, voidFlight } from '../../server/api';
+import { cancelBooking, getAllBookings, issueTicket, refundFlight, resendOtp, viewItinary, viewItinaryWithLogos, voidFlight, hititVoidTicket, hititCancelBooking, hititIssueTicket } from '../../server/api';
 import { generatePDFInvoice } from '../../components/Invoice';
 import DeleteConfirmation from '../../components/modals/DeleteConfirmation';
 import OtpModal from '../../components/OtpModal';
@@ -105,9 +105,33 @@ const FlightBooking = () => {
     const issueTicketFunction = async (id, apiName, ticketData) => {
         try {
             dispatch(setLoading(true)); // Start loading
-            const body = { pnr: id };
-            const res = await issueTicket(body, (apiName === "amadeus" || apiName === "amadus") ? "flights" : apiName);
-
+            let res;
+            if (apiName?.toLowerCase() === "hitit") {
+                const hititBody = {
+                    orderId: id,
+                    ownerCode: "PK",
+                    currency: "PKR",
+                    paymentFunctions: {
+                        paymentProcessingDetails: {
+                            amount: `${ticketData?.finalPrice || 22520}`,
+                            currency: "PKR",
+                            paymentMethod: {
+                                accountableDoc: {
+                                    docType: "MCO",
+                                    ticketId: "4000011567"
+                                }
+                            },
+                            paymentRefID: "PaymentInfo1",
+                            typeCode: "MCO"
+                        }
+                    }
+                };
+                console.log("Hitit Issue Ticket Body (B2B):", JSON.stringify(hititBody, null, 2));
+                res = await hititIssueTicket(hititBody);
+            } else {
+                const body = { pnr: id };
+                res = await issueTicket(body, (apiName === "amadeus" || apiName === "amadus") ? "flights" : apiName);
+            }
 
             // const resData = await viewItinary(id, (ticketData?.api === "amadeus" || ticketData?.api === "amadus") ? "flights" : 'sabre')
 
@@ -115,10 +139,25 @@ const FlightBooking = () => {
             // const agencyLogoUrl = `${NEXT_PUBLIC_PROD_IMAGE_URL}${ticketData?.agencyId?.logo}`;
             // await generatePDFTicket(ticketData, agencyLogoUrl, flightBooking, resData?.result);
 
-            setOpenOtpModal(false)
-            setOtp(["", "", "", "", "", ""])
-            enqueueSnackbar(`Ticket of PNR: ${id} of ${apiName} has been issued successfully!`, { variant: "success" });
-            setOpenCreditModal({ value: true, pnr: id });
+            if (apiName?.toLowerCase() === "hitit") {
+                if (res?.result?.status === 'success') {
+                    setOpenOtpModal(false)
+                    setOtp(["", "", "", "", "", ""])
+                    enqueueSnackbar(`Ticket of PNR: ${id} of ${apiName} has been issued successfully!`, { variant: "success" });
+                    setOpenCreditModal({ value: true, pnr: id });
+                } else {
+                    console.error("Error issuing ticket:", res);
+                    enqueueSnackbar(`Error issuing ticket for PNR: ${id} of ${apiName}. Please try again later.`, { variant: "error" });
+                    setOpenOtpModal(false)
+                    setOtp(["", "", "", "", "", ""])
+                }
+            } else {
+                setOpenOtpModal(false)
+                setOtp(["", "", "", "", "", ""])
+                enqueueSnackbar(`Ticket of PNR: ${id} of ${apiName} has been issued successfully!`, { variant: "success" });
+                setOpenCreditModal({ value: true, pnr: id });
+            }
+
         } catch (error) {
             console.error("Error issuing ticket:", error);
             enqueueSnackbar(`Error issuing ticket for PNR: ${id} of ${apiName}. Please try again later.`, { variant: "error" });
@@ -164,14 +203,39 @@ const FlightBooking = () => {
     const handlePrintInvoice = async (invoiceData) => {
         dispatch(setLoading(true))
 
-        const resData = await viewItinaryWithLogos(invoiceData?.id);
+        // Hit the "old" API first to get basic data for everyone
+        let resData = await viewItinaryWithLogos(invoiceData?.id);
+
+        // If it's Sabre, hit the "new" API as well to get the live paymentDeadline
+        if (invoiceData?.api?.toLowerCase() === 'sabre') {
+            try {
+                const liveData = await viewItinary(invoiceData?.id, 'sabre');
+                const liveBooking = liveData?.result?.data || liveData?.result;
+
+                if (liveBooking?.paymentDeadline && resData?.message?.booking) {
+                    // Extract and format deadline from live data
+                    const deadline = liveBooking.paymentDeadline?.expiryDateTime ||
+                        (liveBooking.paymentDeadline?.expiryDate && liveBooking.paymentDeadline?.expiryTime ?
+                            `${liveBooking.paymentDeadline.expiryDate}T${liveBooking.paymentDeadline.expiryTime}` :
+                            liveBooking.paymentDeadline);
+
+                    // Merge live deadline into our main response data
+                    resData.message.booking.paymentDeadline = deadline;
+                    console.log("[Sabre PDF] Successfully integrated live paymentDeadline:", deadline);
+                }
+            } catch (err) {
+                console.warn("[Sabre PDF] Live viewItinary call failed, using stored data only.", err);
+            }
+        }
 
         // Log the raw API response data
         console.log("API Response Data:", resData);
-        console.log("Message Data:", resData?.message);
-        console.log("Booking Data:", resData?.message?.booking);
-        console.log("Agency Data:", resData?.message?.agency);
-        console.log("Airline Details:", resData?.message?.airlineDetails);
+        if (resData?.message) {
+            console.log("Message Data:", resData.message);
+            console.log("Booking Data:", resData.message.booking);
+            console.log("Agency Data:", resData.message.agency);
+            console.log("Airline Details:", resData.message.airlineDetails);
+        }
 
         const agencyLogoUrl = resData?.message?.agency?.logoUrl || `${NEXT_PUBLIC_PROD_IMAGE_URL}${invoiceData?.agencyId?.logo}`;
 
@@ -228,16 +292,34 @@ const FlightBooking = () => {
             dispatch(setLoading(true))
             let res;
             let statusName;
-            if (isToday(flight?.createdAt) && flight?.status === 'confirmed') {
-                res = await voidFlight(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
-                statusName = 'Voided'
-                dispatch(setLoading(false))
-            } else if (!isToday(flight?.createdAt) && flight?.status === 'confirmed') {
-                res = await refundFlight(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
-                statusName = 'Refunded'
+            if (flight?.status === 'confirmed') {
+                if (flight?.api?.toLowerCase() === 'hitit') {
+                    const voidBody = {
+                        orderId: flight?.id,
+                        ticketDocNbr: flight?.ticket?.[0]?.ticketDocNbr || "2142417468658" // Use dynamic value if available in flight object
+                    };
+                    res = await hititVoidTicket(voidBody);
+                    statusName = 'Voided';
+                } else if (isToday(flight?.createdAt)) {
+                    res = await voidFlight(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
+                    statusName = 'Voided';
+                } else {
+                    res = await refundFlight(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
+                    statusName = 'Refunded';
+                }
                 dispatch(setLoading(false))
             } else if (flight?.status === "hold" || flight?.status === "voided") {
-                res = await cancelBooking(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
+                if (flight?.api?.toLowerCase() === 'hitit') {
+                    const cancelBody = {
+                        orderId: flight?.id,
+                        action: "COMMIT",
+                        ownerCode: "PK",
+                        currency: "PKR"
+                    };
+                    res = await hititCancelBooking(cancelBody);
+                } else {
+                    res = await cancelBooking(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights');
+                }
                 statusName = 'Cancelled'
                 dispatch(setLoading(false))
             } else {
@@ -414,15 +496,33 @@ const FlightBooking = () => {
                     </td> */}
                                         <td style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', justifyContent: row.id ? 'space-between' : 'center', alignItems: 'center' }}>
                                             <Tooltip title={row._id} variant="solid" sx={{ marginRight: '10px' }}>
-                                                <span>{truncateString(row._id, 10)}</span>
+                                                <span>{row._id?.slice(-6)}</span>
                                             </Tooltip>
                                             <ContentCopyIcon sx={{ marginLeft: '10x', cursor: 'pointer' }} onClick={() => copyToClipboard(row._id, 'Booking ID')} />
                                         </td>
                                         <td style={{ textAlign: 'center' }}>{row.travelers[0]?.name?.lastName || row.travelers[0]?.name?.firstName ? `${row.travelers[0]?.name?.lastName}/${row.travelers[0]?.name?.firstName}` : 'N/A'}</td>
                                         <td style={{ textAlign: 'center' }}>{row?.finalPrice ? `RS. ${row?.finalPrice}` : 'N/A'}</td>
-                                        <td style={{ textAlign: 'center' }}>{row.flightOffers[0]?.itineraries[0]?.segments[0]?.departure?.at ? formatDate(row.flightOffers[0]?.itineraries[0]?.segments[0]?.departure?.at) : 'N/A'}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            {row?.api?.toLowerCase() === 'hitit'
+                                                ? (row.departure?.[0]?.departureTime ? formatDate(row.departure[0].departureTime) : 'N/A')
+                                                : (row.flightOffers[0]?.itineraries[0]?.segments[0]?.departure?.at ? formatDate(row.flightOffers[0]?.itineraries[0]?.segments[0]?.departure?.at) : 'N/A')
+                                            }
+                                        </td>
                                         <td style={{ textAlign: 'center' }}>{row.createdAt ? formatDate(row.createdAt) : 'N/A'}</td>
-                                        <td style={{ textAlign: 'center' }}>{(row?.api === "amadeus" || row?.api === "amadus") ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].number}` : row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode && row.flightOffers[0]?.itineraries[0]?.segments[0].number ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].number}` : row.flightOffers[0]?.itineraries[0]?.segments[0]?.operating?.carrierCode && row.flightOffers[0]?.itineraries[0]?.segments[0].carrierCode ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.operating?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].carrierCode}` : 'N/A'}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            {row?.api?.toLowerCase() === 'hitit'
+                                                ? (row.departure?.[0]?.marketingCarrier && row.departure?.[0]?.marketingFlightNumber
+                                                    ? `${row.departure[0].marketingCarrier}-${row.departure[0].marketingFlightNumber}`
+                                                    : row.departure?.[0]?.marketingCarrier || 'N/A')
+                                                : ((row?.api === "amadeus" || row?.api === "amadus")
+                                                    ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].number}`
+                                                    : row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode && row.flightOffers[0]?.itineraries[0]?.segments[0].number
+                                                        ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].number}`
+                                                        : row.flightOffers[0]?.itineraries[0]?.segments[0]?.operating?.carrierCode && row.flightOffers[0]?.itineraries[0]?.segments[0].carrierCode
+                                                            ? `${row.flightOffers[0]?.itineraries[0]?.segments[0]?.operating?.carrierCode}-${row.flightOffers[0]?.itineraries[0]?.segments[0].carrierCode}`
+                                                            : 'N/A')
+                                            }
+                                        </td>
                                         <td style={{ textAlign: 'center' }}>
                                             {row?.bookingType ? (
                                                 <Chip
@@ -465,9 +565,9 @@ const FlightBooking = () => {
                                             N/A
                                         </Chip>}</td>
                                         <td style={{ textAlign: 'center', display: 'flex', justifyContent: row.id ? 'space-between' : 'center', alignItems: 'center' }}>
-                                            {(row?.api === "amadeus" || row?.api === "amadus") && row?.reference ? truncateString(row.reference, 17) : row?.api === "Sabre" && row?.id ? truncateString(row.id, 17) : 'N/A'}
-                                            {((row?.api === "amadeus" || row?.api === "amadus") && row?.reference || row?.api === "Sabre" && row?.id) && (
-                                                <ContentCopyIcon sx={{ marginLeft: '5x', cursor: 'pointer' }} onClick={() => copyToClipboard((row?.api === "amadeus" || row?.api === "amadus") && row?.reference ? row?.reference : row?.api === "Sabre" && row?.id ? row.id : null, 'PNR number')} />
+                                            {(row?.api === "amadeus" || row?.api === "amadus") && row?.reference ? truncateString(row.reference, 17) : (row?.api === "Sabre" || row?.api?.toLowerCase() === "hitit") && row?.id ? truncateString(row.id, 17) : 'N/A'}
+                                            {((row?.api === "amadeus" || row?.api === "amadus") && row?.reference || (row?.api === "Sabre" || row?.api?.toLowerCase() === "hitit") && row?.id) && (
+                                                <ContentCopyIcon sx={{ marginLeft: '5x', cursor: 'pointer' }} onClick={() => copyToClipboard((row?.api === "amadeus" || row?.api === "amadus") && row?.reference ? row?.reference : (row?.api === "Sabre" || row?.api?.toLowerCase() === "hitit") && row?.id ? row.id : null, 'PNR number')} />
                                             )}
                                         </td>
                                         <td style={{ textAlign: 'center' }}>

@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import FlightDetail from '../../components/Drawers/FlightDetail';
 import { useTicketFilterValues } from '../../context/ticketFilterValues';
 import WatchLaterIcon from '@mui/icons-material/WatchLater';
+import moment from 'moment';
 
 
 const FlightInfo = ({ flight, isReturn, logo, name, index, apiName }) => (
@@ -33,7 +34,7 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, apiName }) => (
             {/* <AirplaneTicketIcon sx={{ fontSize: '60px' }} /> */}
             <img src={logo} width={70} height={70} alt={name} />
             <Box sx={{ marginLeft: '10px' }}>
-              <Typography level="body-sm">{flight?.marketing}-{flight?.marketingFlightNumber}</Typography>
+              <Typography level="body-sm">{flight?.marketing || flight?.marketingCarrier || name}-{flight?.marketingFlightNumber}</Typography>
               <Typography level="body-sm">{flight?.marketing === flight?.operatingLogo?.arCode ? "" : "Operated By " + flight?.operatingLogo?.ar}</Typography>
             </Box>
           </>
@@ -43,8 +44,8 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, apiName }) => (
             <img src={logo} width={70} height={70} alt={name} />
             <Box sx={{ marginLeft: '10px' }}>
               <Typography level="title-lg">{name}</Typography>
-              <Typography level="body-sm">{flight?.marketing}-{flight?.marketingFlightNumber}</Typography>
-              <Typography level="body-sm">{flight?.marketing === flight?.operatingLogo?.arCode ? "" : "Operated By " + flight?.operatingLogo?.ar}</Typography>
+              <Typography level="body-sm">{flight?.marketing || flight?.marketingCarrier || name}-{flight?.marketingFlightNumber}</Typography>
+              <Typography level="body-sm">{flight?.marketing === flight?.operatingLogo?.arCode ? "" : flight?.operatingLogo?.ar ? "Operated By " + flight?.operatingLogo?.ar : ""}</Typography>
             </Box>
           </>
         )}
@@ -97,9 +98,9 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, apiName }) => (
           </svg>
           <Stack direction="row" spacing={2} sx={{ width: '100%', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
             <Stack alignItems="center">
-              <Typography level="h4">{extractTime(flight?.departureTime)}</Typography>
+              <Typography level="h4">{apiName === 'hitit' ? moment(flight?.departureTime).format('HH:mm') : extractTime(flight?.departureTime)}</Typography>
               <Typography level="body-xs">{flight?.departureLocation}</Typography>
-              <Typography level="body-sm">{formatDate(flight?.departureTime)}</Typography>
+              <Typography level="body-sm">{apiName === 'hitit' ? moment(flight?.departureTime).format('ddd, DD MMM, YY') : formatDate(flight?.departureTime)}</Typography>
 
             </Stack>
             <Stack alignItems="center">
@@ -116,10 +117,10 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, apiName }) => (
               )}
             </Stack>
             <Stack alignItems="center">
-              <Typography level="h4">{extractTime(flight?.arrivalTime)}</Typography>
+              <Typography level="h4">{apiName === 'hitit' ? moment(flight?.arrivalTime).format('HH:mm') : extractTime(flight?.arrivalTime)}</Typography>
               {/* <FlightLandIcon /> */}
               <Typography level="body-xs">{flight?.arrivalLocation}</Typography>
-              <Typography level="body-sm">{formatDate(flight?.arrivalTime)}</Typography>
+              <Typography level="body-sm">{apiName === 'hitit' ? moment(flight?.arrivalTime).format('ddd, DD MMM, YY') : formatDate(flight?.arrivalTime)}</Typography>
 
             </Stack>
           </Stack>
@@ -163,7 +164,7 @@ const FlightInfoMultiCity = ({ flight, isReturn, logo, name, index, api }) => (
             {/* <AirplaneTicketIcon sx={{ fontSize: '60px' }} /> */}
             <img src={logo} width={70} height={70} alt={name} />
             <Box sx={{ marginLeft: '10px' }}>
-              <Typography level="body-sm">{flight?.marketing}-{flight?.marketingFlightNumber}</Typography>
+              <Typography level="body-sm">{flight?.marketing || flight?.marketingCarrier || name}-{flight?.marketingFlightNumber}</Typography>
             </Box>
           </>
         ) : (
@@ -172,7 +173,7 @@ const FlightInfoMultiCity = ({ flight, isReturn, logo, name, index, api }) => (
             <img src={logo} width={70} height={70} alt={name} />
             <Box sx={{ marginLeft: '10px' }}>
               <Typography level="title-lg">{name}</Typography>
-              <Typography level="body-sm">{flight?.marketing}-{flight?.marketingFlightNumber}</Typography>
+              <Typography level="body-sm">{flight?.marketing || flight?.marketingCarrier || name}-{flight?.marketingFlightNumber}</Typography>
             </Box>
           </>
         )}
@@ -202,9 +203,9 @@ const FlightInfoMultiCity = ({ flight, isReturn, logo, name, index, api }) => (
           </svg>
           <Stack direction="row" spacing={2} sx={{ width: '100%', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
             <Stack alignItems="center">
-              <Typography level="h4">{(api === "amadus" || api === "amadeus") ? extractTime(flight?.departureTime) : extractTime(flight?.departure?.time)}</Typography>
-              <Typography level="body-xs">{(api === "amadus" || api === "amadeus") ? flight?.departureLocation : flight?.departure?.airport}</Typography>
-              <Typography level="body-sm">{(api === "amadus" || api === "amadeus") ? formatDate(flight?.departureTime) : formatDate(flight?.departure?.date)}</Typography>
+              <Typography level="h4">{(api === "hitit") ? moment(flight?.departureTime).format('HH:mm') : (api === "amadus" || api === "amadeus") ? extractTime(flight?.departureTime) : extractTime(flight?.departure?.time)}</Typography>
+              <Typography level="body-xs">{(api === "amadus" || api === "amadeus" || api === "hitit") ? flight?.departureLocation : flight?.departure?.airport}</Typography>
+              <Typography level="body-sm">{(api === "hitit") ? moment(flight?.departureTime).format('ddd, DD MMM, YY') : (api === "amadus" || api === "amadeus") ? formatDate(flight?.departureTime) : formatDate(flight?.departure?.date)}</Typography>
 
             </Stack>
             <Stack alignItems="center">
@@ -221,10 +222,10 @@ const FlightInfoMultiCity = ({ flight, isReturn, logo, name, index, api }) => (
               )}
             </Stack>
             <Stack alignItems="center">
-              <Typography level="h4">{(api === "amadus" || api === "amadeus") ? extractTime(flight?.arrivalTime) : extractTime(flight?.arrival?.time)}</Typography>
+              <Typography level="h4">{(api === "hitit") ? moment(flight?.arrivalTime).format('HH:mm') : (api === "amadus" || api === "amadeus") ? extractTime(flight?.arrivalTime) : extractTime(flight?.arrival?.time)}</Typography>
               {/* <FlightLandIcon /> */}
-              <Typography level="body-xs">{(api === "amadus" || api === "amadeus") ? flight?.arrivalLocation : flight?.arrival?.airport}</Typography>
-              <Typography level="body-sm">{(api === "amadus" || api === "amadeus") ? formatDate(flight?.arrivalTime) : formatDate(flight?.arrival?.date)}</Typography>
+              <Typography level="body-xs">{(api === "amadus" || api === "amadeus" || api === "hitit") ? flight?.arrivalLocation : flight?.arrival?.airport}</Typography>
+              <Typography level="body-sm">{(api === "hitit") ? moment(flight?.arrivalTime).format('ddd, DD MMM, YY') : (api === "amadus" || api === "amadeus") ? formatDate(flight?.arrivalTime) : formatDate(flight?.arrival?.date)}</Typography>
 
             </Stack>
           </Stack>
@@ -244,10 +245,10 @@ const SingleBrandedFareGrid = ({ item, flight, copyToClipboard, loading, toggleD
       <Grid item xs={4} sm={4} md={4}>
         <Box sx={{ padding: '20px', height: '100%' }}>
           <Typography level="h4" noWrap variant="plain" sx={{ textTransform: 'uppercase' }}>
-            {item?.brandName?.[0]}
+            {Array.isArray(item?.brandName) ? item?.brandName?.[0] : item?.brandName || item?.name}
           </Typography>
           <Typography level="body-xs" noWrap variant="plain" sx={{ color: 'grey', textTransform: 'uppercase' }}>
-            {`(${item?.data?.[0]?.bookingCode})`}
+            {`(${item?.data?.[0]?.bookingCode || item?.bookingCode || ""})`}
           </Typography>
         </Box>
       </Grid>
@@ -296,11 +297,11 @@ const SingleBrandedFareGrid = ({ item, flight, copyToClipboard, loading, toggleD
             </Tooltip>
           )}
 
-          {item?.baggage && item?.baggage?.[0]?.allowanceDetail?.weight !== 0 && (
-            <Tooltip title={item?.baggage?.[0]?.allowanceDetail ? `${item?.baggage?.[1]?.allowanceDetail?.pieceCount} PC ${item?.baggage?.[0]?.allowanceDetail?.weight && item?.baggage?.[0]?.allowanceDetail?.unit ? `: ${item?.baggage?.[0]?.allowanceDetail?.weight} ${item?.baggage?.[0]?.allowanceDetail?.unit}` : ''}` : "Baggage Included"} variant="solid">
+          {(item?.baggage && item?.baggage?.[0]?.allowanceDetail?.weight !== 0) || (item?.data?.[0]?.baggageInformation) ? (
+            <Tooltip title={(item?.baggage?.[0]?.allowanceDetail) ? `${item?.baggage?.[1]?.allowanceDetail?.pieceCount} PC ${item?.baggage?.[0]?.allowanceDetail?.weight && item?.baggage?.[0]?.allowanceDetail?.unit ? `: ${item?.baggage?.[0]?.allowanceDetail?.weight} ${item?.baggage?.[0]?.allowanceDetail?.unit}` : ''}` : (item?.data?.[0]?.baggageInformation ? formatAllowanceData(item?.data[0]?.baggageInformation) : "Baggage Included")} variant="solid">
               <LuggageIcon sx={{ fontSize: '20px', cursor: 'pointer' }} />
             </Tooltip>
-          )}
+          ) : null}
         </Box>
       </Grid>
 
@@ -685,7 +686,7 @@ export default function FlightTicketCard({ flight, filteredFlightTickets, setFil
               <>
                 {flight.flights?.map((item, index) => (
                   <React.Fragment key={index}>
-                    <FlightInfoMultiCity flight={item} isReturn={false} logo={item.logo ? item.logo.logo : flight.logo} name={item.logo ? item.logo.code : flight.arCode} api={flight?.api} />
+                    <FlightInfoMultiCity flight={item} isReturn={false} logo={item.logo ? item.logo.logo : flight.logo} name={item.logo ? (item.logo.code || item.logo.arCode) : flight.arCode} api={flight?.api} />
                   </React.Fragment>
                 ))}
               </>
@@ -723,7 +724,7 @@ export default function FlightTicketCard({ flight, filteredFlightTickets, setFil
                         {item?.brandName?.[0]}
                       </Typography>
                       <Typography level="body-xs" noWrap variant="plain" sx={{ color: 'grey', textTransform: 'uppercase' }}>
-                        {`(${item?.data?.[0]?.bookingCode})`}
+                        {`(${item?.data?.[0]?.bookingCode || item?.bookingCode || ""})`}
                       </Typography>
                     </Box>
                   </Grid>

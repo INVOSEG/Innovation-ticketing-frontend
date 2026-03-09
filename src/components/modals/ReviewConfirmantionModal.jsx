@@ -27,7 +27,7 @@ export default function ReviewConfirmationModal({ open, setOpen, flight, branded
                     </DialogTitle>
                     <Divider />
                     <DialogContent sx={{ overflow: 'auto' }}>
-                        {tripType !== "Multi City" && (
+                        {(tripType !== "Multi City" || flight?.api === "hitit") && (
                             <Box>
                                 <Typography level="h4">Review Ticket:</Typography>
                                 <FlightTicketCard flight={flight} singleBrandedFare={singleBrandedFare} isReviewTicket={true} />
@@ -47,7 +47,7 @@ export default function ReviewConfirmationModal({ open, setOpen, flight, branded
                                     <Card key={index} variant="outlined">
                                         <CardContent>
                                             <Typography level="title-lg">{item?.type} {index + 1}:</Typography>
-                                            <Typography level="title-lg">{item?.title} {item.fullName} {item.lastName}</Typography>
+                                            <Typography level="title-lg">{item?.lastName} / {item?.fullName} {item?.title}</Typography>
                                             <Chip
                                                 size="sm"
                                                 variant="soft"

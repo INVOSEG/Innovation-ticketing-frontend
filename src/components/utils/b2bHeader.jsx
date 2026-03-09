@@ -408,7 +408,7 @@ const B2bHeader = ({ divs, activeDiv, setActiveDiv, setActiveOption, activeOptio
                             </Box> */}
 
                             {/* {!isPnr && (
-                        <marquee style={{ backgroundColor: "transparent", color: "white", padding: "10px", fontSize: "22px", marginTop: "10px" }}>Welcome to INNOVATION TECH Portal </marquee>
+                        <marquee style={{ backgroundColor: "transparent", color: "white", padding: "10px", fontSize: "22px", marginTop: "10px" }}>Welcome to Al-Saboor Portal </marquee>
                     )} */}
                             {activeDiv != 0 && (
                                 <Box sx={{ width: { xs: "90%", lg: "70%" }, height: "10rem", display: "flex", justifyContent: "space-between", alignItems: "center", margin: "50px 0px 20px 0px" }}>

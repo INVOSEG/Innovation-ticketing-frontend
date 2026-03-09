@@ -181,7 +181,7 @@ export default function AppLogin() {
                                     Login
                                 </Typography>
                                 {/* <Typography level="body-sm">
-                                    New to INNOVATION TECH? <Link href="/register" level="title-sm">
+                                    New to Al-Saboor? <Link href="/register" level="title-sm">
                                         Regsiter
                                     </Link>
                                 </Typography> */}
@@ -242,7 +242,7 @@ export default function AppLogin() {
                     </Box>
                     <Box component="footer" sx={{ py: 3 }}>
                         <Typography level="body-xs" textAlign="center">
-                            © INNOVATION TECH {new Date().getFullYear()}
+                            © Al-Saboor {new Date().getFullYear()}
                         </Typography>
                     </Box>
                 </Box>

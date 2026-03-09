@@ -55,7 +55,7 @@ const Header = () => {
           <Box sx={{ width: "40%", textAlign: "center" }}>
             <Typography level="body" fontSize="1.4rem">
               with over 40 years of experience in ravel industry and 200 offices
-              world wide, INNOVATION TECH is constantly evolving and adding value
+              world wide, Al-Saboor is constantly evolving and adding value
               to the business
             </Typography>
           </Box>
@@ -142,7 +142,7 @@ const Header = () => {
 
             <Box>
               <Typography sx={{ pl: "5px" }}>Email Address</Typography>
-              <Typography fontSize="1.1rem">INNOVATION TECH@gmail.com</Typography>
+              <Typography fontSize="1.1rem">Al-Saboor@gmail.com</Typography>
             </Box>
           </Box>
         </Box>
@@ -1028,9 +1028,9 @@ const Header = () => {
             Why Choose Us..?
           </Typography>
           {[
-            "Considering that India is World’s fastest growing travel market, INNOVATION TECH offers you an opportunity to enhance your existing business or start a new travel business.",
-            "When you partner with INNOVATION TECH you get a wide range of services and an opportunity to earn great commission with no hidden fee and no overheads. A reputed name for decades and with a long and close relationship with top suppliers allow our travel agents to earn high commission.",
-            "INNOVATION TECH gives you a freedom to start your own travel agency under your own brand.",
+            "Considering that India is World’s fastest growing travel market, Al-Saboor offers you an opportunity to enhance your existing business or start a new travel business.",
+            "When you partner with Al-Saboor you get a wide range of services and an opportunity to earn great commission with no hidden fee and no overheads. A reputed name for decades and with a long and close relationship with top suppliers allow our travel agents to earn high commission.",
+            "Al-Saboor gives you a freedom to start your own travel agency under your own brand.",
             "The company is trusted by more than 45000+ registered agents acting as an independent travel agency with top-notch services and delivering 100% Customer satisfaction.",
           ].map((text, i) => (
             <Typography key={i} sx={{ color: "white", my: "1.2rem" }}>

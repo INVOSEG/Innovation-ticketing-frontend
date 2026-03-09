@@ -63,10 +63,13 @@ import {
   getSabreFlightsData,
   getSabreFlightsDataMultiCity,
   getUpselling,
+  hititFareRules,
+  hititSearchFlights,
   multiCityAmedus,
   revalidateAmadus,
   revalidateSabre,
 } from "../../server/api";
+
 import DirectionsBusIcon from "@mui/icons-material/DirectionsBus";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import PrintIcon from "@mui/icons-material/Print";
@@ -267,6 +270,8 @@ const DurationTooltip = ({ data, apiName, isMultiCity }) => {
 
 const SearchFlights = () => {
   const { enqueueSnackbar } = useSnackbar();
+  // Guard against React StrictMode double-invoking the initial search effect
+  const hasSearchedRef = useRef(false);
   const departureTimes = [
     { logo: "coupon.png", time: "05-12" },
     { logo: "coupon.png", time: "12-18" },
@@ -444,6 +449,35 @@ const SearchFlights = () => {
   const dispatch = useDispatch();
 
   const [openDrawer, setOpenDrawer] = React.useState(false);
+  const [hititRules, setHititRules] = useState(null);
+  const [loadingHititRules, setLoadingHititRules] = useState(false);
+
+  useEffect(() => {
+    const fetchHititRules = async () => {
+      if (openDrawer && openDrawer?.data?.api === "hitit") {
+        setLoadingHititRules(true);
+        try {
+          const payload = {
+            airlineCode: openDrawer?.data?.departure?.[0]?.marketing || openDrawer?.data?.departure?.[0]?.marketingCarrier || openDrawer?.data?.validatingCarrier || openDrawer?.data?.arCode,
+            origin: openDrawer?.data?.departure?.[0]?.departureLocation,
+            destination: openDrawer?.data?.departure?.[openDrawer?.data?.departure?.length - 1]?.arrivalLocation,
+            departureDate: openDrawer?.data?.departure?.[0]?.departureTime,
+            fareBasisCode: openDrawer?.data?.brandedFare?.fareBasisCode || openDrawer?.data?.brandedFare?.bookingCode,
+            currency: openDrawer?.data?.currency || "PKR"
+          };
+          const res = await hititFareRules(payload);
+          if (res && res.result) {
+            setHititRules(res.result);
+          }
+        } catch (error) {
+          console.error("Error fetching Hitit fare rules:", error);
+        } finally {
+          setLoadingHititRules(false);
+        }
+      }
+    };
+    fetchHititRules();
+  }, [openDrawer]);
 
   const [loading, setLoadingDrawer] = React.useState(false);
   const [open, setOpen] = useState(false);
@@ -722,6 +756,13 @@ const SearchFlights = () => {
               response,
               flight
             );
+          } else if (api?.toLowerCase() === "hitit") {
+            data = {
+              status: "success",
+              result: {
+                ticket: [flight]
+              }
+            }
           }
         } catch (error) {
           console.log(error);
@@ -732,9 +773,12 @@ const SearchFlights = () => {
               value: open,
               data: {
                 ...data?.result?.ticket[0],
-                brandedFare: flight?.brandedFare?.find(
-                  (item) => item?.data?.[0]?.bookingCode === code
-                ),
+                brandedFare:
+                  api?.toLowerCase() === "hitit"
+                    ? selectedBrandedFare
+                    : flight?.brandedFare?.find(
+                      (item) => item?.data?.[0]?.bookingCode === code
+                    ),
                 fareRule,
               },
             });
@@ -838,19 +882,29 @@ const SearchFlights = () => {
           response,
           flight
         );
+      } else if (api?.toLowerCase() === "hitit") {
+        data = {
+          status: "success",
+          result: {
+            ticket: [flight]
+          }
+        }
       }
     } catch (error) {
       console.log(error);
     } finally {
       setLoadingDrawer(false);
       if (data?.status !== "fail" && data) {
-        if (tripType === "One Way") {
+        if (tripType === "One Way" && api?.toLowerCase() !== "hitit") {
           setConfirmationModal({
             value: true,
             flight: data?.result?.ticket[0],
-            brandedFare: flight?.brandedFare?.find(
-              (item) => item?.data?.[0]?.bookingCode === code
-            )?.bookingCode,
+            brandedFare:
+              api?.toLowerCase() === "hitit"
+                ? selectedBrandedFare?.bookingCode
+                : flight?.brandedFare?.find(
+                  (item) => item?.data?.[0]?.bookingCode === code
+                )?.bookingCode,
             tripType,
             multicityFlights,
             brandedFareDetail: flight?.brandedFare,
@@ -864,15 +918,23 @@ const SearchFlights = () => {
             state: {
               flight: data?.result?.ticket[0],
               tripType: tripType,
-              brandedFare: flight?.brandedFare?.find(
-                (item) => item?.data?.[0]?.bookingCode === code
-              )?.bookingCode,
+              brandedFare:
+                api?.toLowerCase() === "hitit"
+                  ? selectedBrandedFare?.bookingCode
+                  : flight?.brandedFare?.find(
+                    (item) => item?.data?.[0]?.bookingCode === code
+                  )?.bookingCode,
               multicityFlights: multicityFlights,
               brandedFareDetail: flight?.brandedFare,
               extractedFlightsForMultiCity:
                 tripType === "Multi City"
                   ? extractTripsForMultiCity(
-                    data?.result?.ticket[0]?.flights,
+                    data?.result?.ticket[0]?.api === "hitit"
+                      ? [
+                        ...(data?.result?.ticket[0]?.departure || []),
+                        ...(data?.result?.ticket[0]?.return || []),
+                      ]
+                      : data?.result?.ticket[0]?.flights,
                     multicityFlights,
                     data?.result?.ticket[0]?.api
                   )
@@ -1670,8 +1732,8 @@ const SearchFlights = () => {
         value: searchObj?.legs?.[0]?.destination,
         label: `${arrivalLabel?.name} (${arrivalLabel?.id})`,
       });
-      setDepartureDate(searchObj?.legs?.[0]?.date);
-      setReturnDate(searchObj?.legs?.[0]?.returnDate);
+      setDepartureDate(searchObj?.legs?.[0]?.date ? new Date(searchObj.legs[0].date) : new Date());
+      setReturnDate(searchObj?.legs?.[0]?.returnDate ? new Date(searchObj.legs[0].returnDate) : new Date());
       setInfantsCount(searchObj?.infant);
       setAdultsCount(searchObj?.adult);
       setChildrenCount(searchObj?.child);
@@ -1734,6 +1796,7 @@ const SearchFlights = () => {
     // Function to handle API errors
     const handleApiError = (apiName, error) => {
       console.error(`Error fetching flights from ${apiName} API:`, error);
+      if (apiName === "Hitit") return;
       enqueueSnackbar(
         `Failed to fetch data from ${apiName} API. Please try again.`,
         {
@@ -1742,97 +1805,130 @@ const SearchFlights = () => {
       );
     };
 
+    // Hitit Payload Construction
+    let hititPaxList = [];
+    let paxIdCounter = 1;
+    const finalAdults = searchObj?.adult || adultsCount;
+    const finalChild = searchObj?.child || childrenCount;
+    const finalInfant = searchObj?.infant || infantsCount;
+
+    for (let i = 0; i < finalAdults; i++) {
+      hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "ADT" });
+    }
+    for (let i = 0; i < finalChild; i++) {
+      hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "CHD" });
+    }
+    for (let i = 0; i < finalInfant; i++) {
+      hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "INF" });
+    }
+
+    const isRoundTrip = searchParams.tripType === "Return";
+
+    const hititParams = {
+      originDestCriteria: [
+        {
+          originCode: searchParams.departure,
+          destCode: searchParams.arrival,
+          departureDate: searchParams.startDate,
+        },
+      ],
+      paxList: hititPaxList,
+      currency: searchParams.currencyPreference || "PKR",
+      cabinClass: searchParams.travelClass === "Economy" ? "Y" : "Y",
+      tripType: isRoundTrip ? "RoundTrip" : "OneWay",
+    };
+
+    if (isRoundTrip && searchParams.endDate) {
+      hititParams.originDestCriteria.push({
+        originCode: searchParams.arrival,
+        destCode: searchParams.departure,
+        departureDate: searchParams.endDate,
+      });
+    }
+
     if (gdsSelection === "Both") {
-      getSabreFlightsData(searchParams)
+      const sabrePromise = getSabreFlightsData(searchParams)
         .then((data) => handleApiResponse("Sabre", data))
-        .catch((error) => handleApiError("Sabre", error))
-        .finally(() => {
-          // Dispatch the merged tickets and set loading to false
-          setFlightTickets(mergedTickets);
-          const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(mergedTickets);
-          setTripOption(tripType);
+        .catch((error) => handleApiError("Sabre", error));
 
-          if (!isAlreadyAdded) {
-            handleAddSearch(
-              tripType === "Round Trip" ? returnDate : null,
-              departureDate,
-              adultsCount,
-              childrenCount,
-              infantsCount
-            );
-          }
+      const hititPromise = hititSearchFlights(hititParams)
+        .then((data) => handleApiResponse("Hitit", data))
+        .catch((error) => handleApiError("Hitit", error));
 
-          setIsAlreadyAdded(false);
+      Promise.allSettled([sabrePromise, hititPromise]).then(() => {
+        // Dispatch the merged tickets and set loading to false
+        setFlightTickets(mergedTickets);
+        const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
+        setAllTickets(filteredData);
+        setAllTicketsV2(filteredData);
+        setFilteredFlightTickets(mergedTickets);
+        setTripOption(tripType);
 
-          // Comment the following lines of Amadeus API
-          // getFlightsData(searchParams)
-          //   .then((data) => handleApiResponse("Amadeus", data))
-          //   .catch((error) => handleApiError("Amadeus", error))
-          //   .finally(() => {
-          //     setFlightTickets(mergedTickets);
-          //     // dispatch(setLoading(false));
-          //     const filteredData =
-          //       filterFlightsWithLowestFare(mergedTickets) || [];
-          //     setAllTickets(filteredData);
-          //     setAllTicketsV2(filteredData);
-          //     setFilteredFlightTickets(mergedTickets);
+        if (!isAlreadyAdded) {
+          handleAddSearch(
+            tripType === "Round Trip" ? returnDate : null,
+            departureDate,
+            adultsCount,
+            childrenCount,
+            infantsCount
+          );
+        }
 
-          //     if (mergedTickets.length === 0 && searchObj?.legs?.length) {
-          //       // dispatch(setLoading(false));
-          //       enqueueSnackbar("No Ticket Found!", {
-          //         variant: "warning",
-          //       });
-          //     }
-          //   });
-        });
+        setIsAlreadyAdded(false);
+      }); // End of Promise.allSettled
+
     } else if (gdsSelection === "Sabre") {
-      getSabreFlightsData(searchParams)
+      // Treat "Sabre" selection same as "Both" - hit both APIs
+      const sabrePromise = getSabreFlightsData(searchParams)
         .then((data) => handleApiResponse("Sabre", data))
-        .catch((error) => handleApiError("Sabre", error))
-        .finally(() => {
-          // Dispatch the merged tickets and set loading to false
-          setFlightTickets(mergedTickets);
-          const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(mergedTickets);
-          setTripOption(tripType);
+        .catch((error) => handleApiError("Sabre", error));
 
-          if (!isAlreadyAdded) {
-            handleAddSearch(
-              tripType === "Round Trip" ? returnDate : null,
-              departureDate,
-              adultsCount,
-              childrenCount,
-              infantsCount
-            );
-          }
+      const hititPromise = hititSearchFlights(hititParams)
+        .then((data) => handleApiResponse("Hitit", data))
+        .catch((error) => handleApiError("Hitit", error));
 
-          setIsAlreadyAdded(false);
-        });
+      Promise.allSettled([sabrePromise, hititPromise]).then(() => {
+        // Dispatch the merged tickets and set loading to false
+        setFlightTickets(mergedTickets);
+        const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
+        setAllTickets(filteredData);
+        setAllTicketsV2(filteredData);
+        setFilteredFlightTickets(mergedTickets);
+        setTripOption(tripType);
+
+        if (!isAlreadyAdded) {
+          handleAddSearch(
+            tripType === "Round Trip" ? returnDate : null,
+            departureDate,
+            adultsCount,
+            childrenCount,
+            infantsCount
+          );
+        }
+
+        setIsAlreadyAdded(false);
+      });
+
     } else if (gdsSelection === "Amadeus") {
       // Comment the following lines of Amadeus API
-      getFlightsData(searchParams)
-        .then((data) => handleApiResponse("Amadeus", data))
-        .catch((error) => handleApiError("Amadeus", error))
-        .finally(() => {
-          setFlightTickets(mergedTickets);
-          // dispatch(setLoading(false));
-          const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(mergedTickets);
-
-          if (mergedTickets.length === 0 && searchObj?.legs?.length) {
-            // dispatch(setLoading(false));
-            enqueueSnackbar("No Ticket Found!", {
-              variant: "warning",
-            });
-          }
-        });
+      // getFlightsData(searchParams)
+      //   .then((data) => handleApiResponse("Amadeus", data))
+      //   .catch((error) => handleApiError("Amadeus", error))
+      //   .finally(() => {
+      //     setFlightTickets(mergedTickets);
+      //     // dispatch(setLoading(false));
+      //     const filteredData = filterFlightsWithLowestFare(mergedTickets) || [];
+      //     setAllTickets(filteredData);
+      //     setAllTicketsV2(filteredData);
+      //     setFilteredFlightTickets(mergedTickets);
+      //
+      //     if (mergedTickets.length === 0 && searchObj?.legs?.length) {
+      //       // dispatch(setLoading(false));
+      //       enqueueSnackbar("No Ticket Found!", {
+      //         variant: "warning",
+      //       });
+      //     }
+      //   });
     }
   };
 
@@ -2069,158 +2165,188 @@ const SearchFlights = () => {
     }
 
     if (gdsSelection === "Both") {
-      getSabreFlightsDataMultiCity(body)
+      const sabrePromise = getSabreFlightsDataMultiCity(body)
         .then((sabreApiResult) => {
           const sabreResult = sabreApiResult?.result.ticket || [];
-          const allTickets = [...sabreResult];
-          setFlightTickets(allTickets);
-
-          const filteredData = filterFlightsWithLowestFare(allTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(allTickets);
-
-          if (!isAlreadyAdded) {
-            handleAddSearch(
-              null,
-              null,
-              adultsCount,
-              childrenCount,
-              infantsCount
-            );
-          }
-
-          if (sabreResult.length === 0) {
-            enqueueSnackbar("No flight tickets found for multicity search!", {
-              variant: "info",
-            });
-            navigate("/b2b/searchticket");
-          }
-
-          // multiCityAmedus(AmedusBody)
-          //   .then((apiResult) => {
-          //     const amedusResult = apiResult?.result.tickets || [];
-          //     const allTickets = [...sabreResult, ...amedusResult];
-          //     setFlightTickets(allTickets);
-
-          //     const filteredData = filterFlightsWithLowestFare(allTickets) || [];
-          //     setAllTickets(filteredData);
-          //     setAllTicketsV2(filteredData);
-          //     setFilteredFlightTickets(allTickets);
-          //   })
-          //   .catch((error) => {
-          //     console.error("Error fetching multicity flights:", error);
-          //   });
-
-          if (allTickets.length === 0) {
-            enqueueSnackbar(
-              "No flight tickets found for multicity search. Please try different search criteria.",
-              {
-                variant: "info",
-              }
-            );
-            navigate("/b2b/searchticket");
-          }
+          return sabreResult;
         })
-        .catch((error) => {
-          console.error("Error fetching multicity flights:", error);
-          // dispatch(setLoading(false));
-          enqueueSnackbar(
-            error?.message ||
-            "Failed to fetch multicity flight data. Please try again.",
-            {
-              variant: "error",
-            }
-          );
-        })
-        .finally(() => {
-          setIsAlreadyAdded(false);
-          setIsModifySearchOn(false);
-          // enqueueSnackbar("Successfully loaded all GDS!", {
-          //   variant: "success",
-          // });
+        .catch(err => {
+          console.log(err);
+          return [];
         });
-    } else if (gdsSelection === "Sabre") {
-      getSabreFlightsDataMultiCity(body)
-        .then((sabreApiResult) => {
-          const sabreResult = sabreApiResult?.result.ticket || [];
-          const allTickets = [...sabreResult];
-          setFlightTickets(allTickets);
-          dispatch(setLoading(false));
 
-          const filteredData = filterFlightsWithLowestFare(allTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(allTickets);
+      // Hitit MultiCity Payload
+      let hititPaxList = [];
+      let paxIdCounter = 1;
+      const finalAdults = searchObj?.adult || adultsCount;
+      const finalChild = searchObj?.child || childrenCount;
+      const finalInfant = searchObj?.infant || infantsCount;
 
-          if (!isAlreadyAdded) {
-            handleAddSearch(
-              null,
-              null,
-              adultsCount,
-              childrenCount,
-              infantsCount
-            );
-          }
+      for (let i = 0; i < finalAdults; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "ADT" });
+      }
+      for (let i = 0; i < finalChild; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "CHD" });
+      }
+      for (let i = 0; i < finalInfant; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "INF" });
+      }
 
-          if (sabreResult.length === 0) {
-            enqueueSnackbar("No flight tickets found for multicity search!", {
-              variant: "info",
-            });
-            navigate("/b2b/searchticket");
-          }
+      const hititMultiParams = {
+        originDestCriteria: multicitySearchParams.map((seg) => ({
+          originCode: seg.OriginLocation.LocationCode,
+          destCode: seg.DestinationLocation.LocationCode,
+          departureDate: seg.DepartureDateTime.split("T")[0],
+        })),
+        paxList: hititPaxList,
+        currency: currencyPreferencePara || "PKR",
+        cabinClass: "Y",
+        tripType: "MultiDestination",
+      };
 
-          if (allTickets.length === 0) {
-            enqueueSnackbar(
-              "No flight tickets found for multicity search. Please try different search criteria.",
-              {
-                variant: "info",
-              }
-            );
-            navigate("/b2b/searchticket");
-          }
+      const hititPromise = hititSearchFlights(hititMultiParams)
+        .then((res) => {
+          return res?.result?.ticket || [];
         })
-        .catch((error) => {
-          console.error("Error fetching multicity flights:", error);
-          // dispatch(setLoading(false));
-          enqueueSnackbar(
-            error?.message ||
-            "Failed to fetch multicity flight data. Please try again.",
-            {
-              variant: "error",
-            }
-          );
-        })
-        .finally(() => {
-          setIsAlreadyAdded(false);
-          setIsModifySearchOn(false);
-          dispatch(setLoading(false));
-          // enqueueSnackbar("Successfully loaded!", {
-          //   variant: "success",
-          // });
+        .catch(err => {
+          console.error("Hitit MultiCity Error", err);
+          return [];
         });
-    } else if (gdsSelection === "Amadeus") {
-      multiCityAmedus(AmedusBody)
-        .then((apiResult) => {
-          const amedusResult = apiResult?.result.tickets || [];
-          const allTickets = [...amedusResult];
-          setFlightTickets(allTickets);
 
-          const filteredData = filterFlightsWithLowestFare(allTickets) || [];
-          setAllTickets(filteredData);
-          setAllTicketsV2(filteredData);
-          setFilteredFlightTickets(allTickets);
-        })
-        .catch((error) => {
-          console.error("Error fetching multicity flights:", error);
-        })
-        .finally(() => {
-          setIsAlreadyAdded(false);
-          setIsModifySearchOn(false);
-          enqueueSnackbar("Successfully loaded Amadeus GDS!", {
-            variant: "success",
+      Promise.all([sabrePromise, hititPromise]).then(([sabreTickets, hititTickets]) => {
+        const merged = [...sabreTickets, ...hititTickets];
+        setFlightTickets(merged);
+        const filteredData = filterFlightsWithLowestFare(merged) || [];
+        setAllTickets(filteredData);
+        setAllTicketsV2(filteredData);
+        setFilteredFlightTickets(merged);
+
+        if (!isAlreadyAdded) {
+          handleAddSearch(
+            null,
+            null,
+            adultsCount,
+            childrenCount,
+            infantsCount
+          );
+        }
+        setIsAlreadyAdded(false);
+
+        if (merged.length === 0) {
+          enqueueSnackbar("No flight tickets found for multicity search!", {
+            variant: "info",
           });
+          navigate("/b2b/searchticket");
+        }
+      })
+        .finally(() => {
+          dispatch(setLoading(false));
         });
+
+
+    } else if (gdsSelection === "Sabre") {
+      const sabrePromise = getSabreFlightsDataMultiCity(body)
+        .then((sabreApiResult) => {
+          const sabreResult = sabreApiResult?.result.ticket || [];
+          return sabreResult;
+        })
+        .catch(err => {
+          console.log(err);
+          return [];
+        });
+
+      // Hitit MultiCity Payload
+      let hititPaxList = [];
+      let paxIdCounter = 1;
+      const finalAdults = searchObj?.adult || adultsCount;
+      const finalChild = searchObj?.child || childrenCount;
+      const finalInfant = searchObj?.infant || infantsCount;
+
+      for (let i = 0; i < finalAdults; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "ADT" });
+      }
+      for (let i = 0; i < finalChild; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "CHD" });
+      }
+      for (let i = 0; i < finalInfant; i++) {
+        hititPaxList.push({ paxID: `PAX-${paxIdCounter++}`, ptc: "INF" });
+      }
+
+      const hititMultiParams = {
+        originDestCriteria: multicitySearchParams.map(seg => ({
+          originCode: seg.OriginLocation.LocationCode,
+          destCode: seg.DestinationLocation.LocationCode,
+          departureDate: seg.DepartureDateTime.split('T')[0]
+        })),
+        paxList: hititPaxList,
+        currency: currencyPreferencePara || "PKR",
+        cabinClass: "Y",
+        tripType: "MultiCity"
+      };
+
+      const hititPromise = hititSearchFlights(hititMultiParams)
+        .then(res => {
+          return res?.result?.ticket || [];
+        })
+        .catch(err => {
+          console.error("Hitit MultiCity Error", err);
+          return [];
+        });
+
+      Promise.all([sabrePromise, hititPromise]).then(([sabreTickets, hititTickets]) => {
+        const merged = [...sabreTickets, ...hititTickets];
+        setFlightTickets(merged);
+        const filteredData = filterFlightsWithLowestFare(merged) || [];
+        setAllTickets(filteredData);
+        setAllTicketsV2(filteredData);
+        setFilteredFlightTickets(merged);
+
+        if (!isAlreadyAdded) {
+          handleAddSearch(
+            null,
+            null,
+            adultsCount,
+            childrenCount,
+            infantsCount
+          );
+        }
+        setIsAlreadyAdded(false);
+
+        if (merged.length === 0) {
+          enqueueSnackbar("No flight tickets found for multicity search!", {
+            variant: "info",
+          });
+          navigate("/b2b/searchticket");
+        }
+      })
+        .finally(() => {
+          setIsAlreadyAdded(false);
+          setIsModifySearchOn(false);
+          dispatch(setLoading(false));
+        });
+
+    } else if (gdsSelection === "Amadeus") {
+      // multiCityAmedus(AmedusBody)
+      //   .then((apiResult) => {
+      //     const amedusResult = apiResult?.result.tickets || [];
+      //     const allTickets = [...amedusResult];
+      //     setFlightTickets(allTickets);
+      //
+      //     const filteredData = filterFlightsWithLowestFare(allTickets) || [];
+      //     setAllTickets(filteredData);
+      //     setAllTicketsV2(filteredData);
+      //     setFilteredFlightTickets(allTickets);
+      //   })
+      //   .catch((error) => {
+      //     console.error("Error fetching multicity flights:", error);
+      //   })
+      //   .finally(() => {
+      //     setIsAlreadyAdded(false);
+      //     setIsModifySearchOn(false);
+      //     enqueueSnackbar("Successfully loaded Amadeus GDS!", {
+      //       variant: "success",
+      //     });
+      //   });
     }
   };
 
@@ -2533,9 +2659,10 @@ const SearchFlights = () => {
       }
 
       // Apply markup to each adjustedFare in brandedFare
-      const updatedBrandedFare = (item.brandedFare || []).map((fare) => {
-        const originalAdjustedFare = parseFloat(fare.adjustedPrice);
-        const originalTotalFare = parseFloat(fare.totalFare);
+      // Helper to apply markup to a single fare object
+      const calcFareMarkup = (fare) => {
+        const originalAdjustedFare = parseFloat(fare.adjustedPrice || fare.fare || 0);
+        const originalTotalFare = parseFloat(fare.totalFare || fare.fare || 0);
 
         let updatedAdjustedFare = originalAdjustedFare;
         let updatedTotalFare = originalTotalFare;
@@ -2552,8 +2679,20 @@ const SearchFlights = () => {
           ...fare,
           adjustedPrice: parseInt(updatedAdjustedFare.toFixed(2)),
           totalFare: parseInt(updatedTotalFare.toFixed(2)),
+          fare: fare.fare ? parseInt(updatedTotalFare.toFixed(2)) : fare.fare,
         };
-      });
+      };
+
+      // Apply markup to each adjustedFare in brandedFare
+      let updatedBrandedFare = item.brandedFare || [];
+      if (Array.isArray(item.brandedFare)) {
+        updatedBrandedFare = item.brandedFare.map(calcFareMarkup);
+      } else if (item.brandedFare?.data && Array.isArray(item.brandedFare.data)) {
+        updatedBrandedFare = {
+          ...item.brandedFare,
+          data: item.brandedFare.data.map(calcFareMarkup)
+        };
+      }
       return {
         ...item,
         totalFare: parseInt(newTotalFare.toFixed(2)), // keeping it to 2 decimal places as string
@@ -2815,7 +2954,9 @@ const SearchFlights = () => {
       setFlightSegments(multicityFlights);
     }
 
-    if (tripType !== "Multi City") {
+    // Use ref guard to prevent React StrictMode from firing the search twice
+    if (tripType !== "Multi City" && !hasSearchedRef.current) {
+      hasSearchedRef.current = true;
       handleSearch();
     }
   }, []);
@@ -5286,7 +5427,7 @@ const SearchFlights = () => {
                                     letterSpacing: "4px",
                                   }}
                                 >
-                                  {flight?.departure?.[0]?.marketing}-
+                                  {flight?.api === "hitit" ? flight?.departure?.[0]?.marketingCarrier : flight?.departure?.[0]?.marketing}-
                                   {
                                     flight?.departure?.[0]
                                       ?.marketingFlightNumber
@@ -5304,11 +5445,11 @@ const SearchFlights = () => {
                                     letterSpacing: "2px",
                                   }}
                                 >
-                                  {flight.arCode ===
-                                    flight.departure[0].operatinglogo.ar
+                                  {flight?.api === "hitit" || flight.arCode ===
+                                    flight?.departure?.[0]?.operatinglogo?.ar
                                     ? ""
                                     : "Operated By: " +
-                                    flight.departure[0].operatinglogo.ar}
+                                    flight?.departure?.[0]?.operatinglogo?.ar}
                                 </Typography>
                               </Box>
                             </Box>
@@ -5517,7 +5658,7 @@ const SearchFlights = () => {
                                     letterSpacing: "4px",
                                   }}
                                 >
-                                  {flight?.departure?.[0]?.marketing}-
+                                  {flight?.api === "hitit" ? (flight?.departure?.[0]?.marketingCarrier || flight?.arCode) : flight?.departure?.[0]?.marketing}-
                                   {
                                     flight?.departure?.[0]
                                       ?.marketingFlightNumber
@@ -5535,11 +5676,11 @@ const SearchFlights = () => {
                                     letterSpacing: "2px",
                                   }}
                                 >
-                                  {flight.arCode ===
-                                    flight.departure[0].operatinglogo.ar
+                                  {flight?.api === "hitit" || flight.arCode ===
+                                    flight?.departure?.[0]?.operatinglogo?.ar
                                     ? ""
                                     : "Operated By: " +
-                                    flight.departure[0].operatinglogo.ar}
+                                    flight?.departure?.[0]?.operatinglogo?.ar}
                                 </Typography>
                               </Box>
                             </Box>
@@ -5766,7 +5907,7 @@ const SearchFlights = () => {
                                     letterSpacing: "4px",
                                   }}
                                 >
-                                  {flight?.return?.[0]?.marketing}-
+                                  {flight?.api === "hitit" ? (flight?.return?.[0]?.marketingCarrier || flight?.arCode) : flight?.return?.[0]?.marketing}-
                                   {flight?.return?.[0]?.marketingFlightNumber}
                                 </Typography>
                                 <Typography
@@ -5781,11 +5922,11 @@ const SearchFlights = () => {
                                     letterSpacing: "2px",
                                   }}
                                 >
-                                  {flight.arCode ===
-                                    flight.return?.[0].operatinglogo.ar
+                                  {flight?.api === "hitit" || flight.arCode ===
+                                    flight?.return?.[0]?.operatinglogo?.ar
                                     ? ""
                                     : "Operated By: " +
-                                    flight.return?.[0].operatinglogo.ar}
+                                    flight?.return?.[0]?.operatinglogo?.ar}
                                 </Typography>
                               </Box>
                             </Box>
@@ -5986,7 +6127,12 @@ const SearchFlights = () => {
                           </Stack>
 
                           {extractTrips(
-                            flight?.flights,
+                            flight?.api === "hitit"
+                              ? [
+                                ...(flight?.departure || []),
+                                ...(flight?.return || []),
+                              ]
+                              : flight?.flights,
                             multicityFlights,
                             flight?.api
                           )?.map((item, flightIndex) => (
@@ -6014,8 +6160,9 @@ const SearchFlights = () => {
                                     height="35px"
                                   />
                                   <Box>
-                                    <Typography>
-                                      {item?.connectingFlights[0]?.logo?.code}
+                                    <Typography
+                                    >
+                                      {flight?.api === "hitit" ? flight?.arCode : item?.connectingFlights[0]?.logo?.code || item?.connectingFlights[0]?.logo?.arCode}
                                     </Typography>
                                     <Typography
                                       sx={{
@@ -6029,7 +6176,7 @@ const SearchFlights = () => {
                                         letterSpacing: "4px",
                                       }}
                                     >
-                                      {item?.connectingFlights?.[0]?.marketing}-
+                                      {item?.connectingFlights?.[0]?.marketing || item?.connectingFlights?.[0]?.marketingCarrier || flight?.arCode}-
                                       {
                                         item?.connectingFlights?.[0]
                                           ?.marketingFlightNumber
@@ -6242,7 +6389,7 @@ const SearchFlights = () => {
                       )}
 
                       {/* This portion contain the all branded fares of sabre */}
-                      {flight?.brandedFare
+                      {Array.isArray(flight?.brandedFare) && flight?.brandedFare
                         ?.slice(
                           0,
                           showAll?.indexOf === index && showAll?.value
@@ -6301,27 +6448,29 @@ const SearchFlights = () => {
                                 gap: "8px",
                               }}
                             >
-                              <Box
-                                sx={{
-                                  backgroundColor: "white",
-                                  display: "flex",
-                                  gap: "4px",
-                                  p: 0.2,
-                                  border: "1px solid lightgrey",
-                                  borderRadius: "5px",
-                                }}
-                              >
-                                <AirlineSeatReclineExtraIcon />
-                                <Typography
+                              {item?.seats && (
+                                <Box
                                   sx={{
-                                    fontWeight: "600",
-                                    fontSize: "12px",
-                                    color: "slate",
+                                    backgroundColor: "white",
+                                    display: "flex",
+                                    gap: "4px",
+                                    p: 0.2,
+                                    border: "1px solid lightgrey",
+                                    borderRadius: "5px",
                                   }}
                                 >
-                                  {item?.seats}
-                                </Typography>
-                              </Box>
+                                  <AirlineSeatReclineExtraIcon />
+                                  <Typography
+                                    sx={{
+                                      fontWeight: "600",
+                                      fontSize: "12px",
+                                      color: "slate",
+                                    }}
+                                  >
+                                    {item?.seats}
+                                  </Typography>
+                                </Box>
+                              )}
                               <Typography
                                 sx={{
                                   fontWeight: "600",
@@ -6601,27 +6750,29 @@ const SearchFlights = () => {
                                 gap: "8px",
                               }}
                             >
-                              <Box
-                                sx={{
-                                  backgroundColor: "white",
-                                  display: "flex",
-                                  gap: "4px",
-                                  p: 0.2,
-                                  border: "1px solid lightgrey",
-                                  borderRadius: "5px",
-                                }}
-                              >
-                                <AirlineSeatReclineExtraIcon />
-                                <Typography
+                              {flight?.itineraries?.numberOfBookableSeats && (
+                                <Box
                                   sx={{
-                                    fontWeight: "600",
-                                    fontSize: "12px",
-                                    color: "slate",
+                                    backgroundColor: "white",
+                                    display: "flex",
+                                    gap: "4px",
+                                    p: 0.2,
+                                    border: "1px solid lightgrey",
+                                    borderRadius: "5px",
                                   }}
                                 >
-                                  {flight?.itineraries?.numberOfBookableSeats}
-                                </Typography>
-                              </Box>
+                                  <AirlineSeatReclineExtraIcon />
+                                  <Typography
+                                    sx={{
+                                      fontWeight: "600",
+                                      fontSize: "12px",
+                                      color: "slate",
+                                    }}
+                                  >
+                                    {flight?.itineraries?.numberOfBookableSeats}
+                                  </Typography>
+                                </Box>
+                              )}
                               {/* <Typography sx={{ fontWeight: "600", fontSize: "12px", color: "red", backgroundColor: "white", p: 0.2, border: "1px solid lightgrey", borderRadius: "5px" }}>N</Typography>
                             <LuggageIcon sx={{ width: "25px", height: "25px" }} /> */}
                             </Box>
@@ -6830,6 +6981,126 @@ const SearchFlights = () => {
                             </Box>
                           </Box>
                         )}
+
+                      {/* This portion contain the all branded fares of Hitit */}
+                      {!Array.isArray(flight?.brandedFare) && flight?.brandedFare?.data && flight?.brandedFare?.data
+                        ?.slice(
+                          0,
+                          showAll?.indexOf === index && showAll?.value
+                            ? flight?.brandedFare?.data?.length
+                            : 2
+                        )
+                        ?.map((item, index) => (
+                          <Box
+                            key={index}
+                            sx={{
+                              width: "100%",
+                              height: "auto",
+                              display: "flex",
+                              backgroundColor: "#f7ebf5",
+                              borderRadius: "10px",
+                              marginBottom: "10px"
+                            }}
+                          >
+                            <Box sx={{ width: "25%", height: "100%", display: "flex", gap: "8px", alignItems: "center", ml: "8px" }}>
+                              <Box>
+                                <Typography sx={{ fontSize: { sm: "12px", md: "14px", lg: "16px" } }}>
+                                  {item?.brandName || item?.name || "Brand"}
+                                </Typography>
+                                <Typography sx={{ fontSize: "12px", fontWeight: "400", color: "grey" }}>
+                                  {`(${item?.bookingCode})`}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Column 2: Seats & Luggage */}
+                            <Box sx={{ width: "25%", height: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
+                              {item?.totalSeats && (
+                                <Box sx={{ backgroundColor: "white", display: "flex", gap: "4px", p: 0.2, border: "1px solid lightgrey", borderRadius: "5px" }}>
+                                  <AirlineSeatReclineExtraIcon />
+                                  <Typography sx={{ fontWeight: "600", fontSize: "12px", color: "slate" }}>
+                                    {item?.totalSeats}
+                                  </Typography>
+                                </Box>
+                              )}
+                              <Box sx={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                                <LuggageIcon sx={{ width: "25px", height: "25px" }} />
+                                { /* User requested removal of weight info */}
+                              </Box>
+                            </Box>
+
+                            {/* Column 3: Flight Details */}
+                            <Box sx={{ width: "25%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                              <Typography
+                                sx={{
+                                  fontSize: { sm: "12px", md: "13px", lg: "14px" },
+                                  color: "#036bb0",
+                                  cursor: "pointer",
+                                }}
+                                onClick={toggleDrawer(
+                                  true,
+                                  flight?.api,
+                                  flight?.itineraries,
+                                  flight?.uuid,
+                                  item?.bookingCode || "Y",
+                                  tripType,
+                                  item?.fare,
+                                  flight,
+                                  item
+                                )}
+                              >
+                                Flight Details{" "}
+                              </Typography>
+                              <ArrowDropDownIcon
+                                sx={{
+                                  height: "20px",
+                                  width: "40px",
+                                  fontSize: "32px",
+                                  color: "#036bb0",
+                                  display: {
+                                    sm: "none",
+                                    md: "none",
+                                    lg: "block",
+                                  },
+                                }}
+                              />
+                            </Box>
+
+                            <Box sx={{ width: "25%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: 'center' }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                <Typography sx={{ fontSize: "14px", fontWeight: "700" }}>RS.</Typography>
+                                <Typography sx={{ fontWeight: "700", fontSize: { sm: "20px", md: "22px", lg: "24px" } }}>
+                                  {item?.fare}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            <Box sx={{ width: "25%", height: "100%", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "1rem" }}>
+                              <Button
+                                variant="outlined"
+                                sx={{ backgroundColor: "white", color: "#036bb0", fontSize: { sm: "9px", md: "12px", lg: "16px" }, height: "auto", minHeight: '30px' }}
+                                onClick={() => {
+                                  handleBookNow(
+                                    flight?.api,
+                                    flight?.itineraries,
+                                    flight?.uuid,
+                                    item?.bookingCode || "Y",
+                                    tripType,
+                                    item?.fare,
+                                    flight,
+                                    multicityFlights,
+                                    item
+                                  );
+                                }}
+                              >
+                                Book Now
+                              </Button>
+                              <Box sx={{ display: "flex", flexDirection: "column", mr: "8px", gap: "5px" }}>
+                                <ContentCopyIcon sx={{ cursor: "pointer" }} onClick={() => copyToClipboard(flight)} />
+                              </Box>
+                            </Box>
+                          </Box>
+                        ))}
 
                       {/* Branded fares after clicking on View More Fare */}
                       {/* ************************************************************************************************************* */}
@@ -7150,8 +7421,29 @@ const SearchFlights = () => {
                             </Button>
                           )}
 
+                        {/* Button for Hitit Branded Fares */}
+                        {!Array.isArray(flight?.brandedFare) && flight?.brandedFare?.data?.length - 2 > 0 && (
+                          <Button
+                            sx={{
+                              height: "60%",
+                              backgroundColor: "#036bb0",
+                              color: "white",
+                            }}
+                            onClick={() =>
+                              handleViewMoreClick(
+                                index,
+                                showAll?.indexOf === index && showAll?.value
+                              )
+                            }
+                          >
+                            {showAll?.indexOf === index && showAll?.value
+                              ? "Show less fare"
+                              : `+${flight?.brandedFare?.data?.length - 2} more fare`}
+                          </Button>
+                        )}
+
                         {/* Button for Sabre Branded Fares */}
-                        {flight?.brandedFare?.length - 2 > 0 && (
+                        {Array.isArray(flight?.brandedFare) && flight?.brandedFare?.length - 2 > 0 && (
                           <Button
                             sx={{
                               height: "60%",
@@ -7233,7 +7525,12 @@ const SearchFlights = () => {
                           {extractTripsForMultiCity(
                             openDrawer?.data?.api?.startsWith("amad")
                               ? openDrawer?.data?.departure
-                              : openDrawer?.data?.flights,
+                              : openDrawer?.data?.api === "hitit"
+                                ? [
+                                  ...(openDrawer?.data?.departure || []),
+                                  ...(openDrawer?.data?.return || []),
+                                ]
+                                : openDrawer?.data?.flights,
                             multicityFlights,
                             openDrawer?.data?.api
                           )?.map((flightItem, index) => (
@@ -7249,7 +7546,7 @@ const SearchFlights = () => {
                             {fromLocation?.code} <ArrowRightAltIcon />{" "}
                             {toLocation?.code}
                           </Tab>
-                          {openDrawer?.data?.return && (
+                          {openDrawer?.data?.return?.length > 0 && (
                             <Tab>
                               {toLocation?.code} <ArrowRightAltIcon />{" "}
                               {fromLocation?.code}
@@ -7372,7 +7669,7 @@ const SearchFlights = () => {
                                 </Typography>
 
                                 <Typography level="body-xs">
-                                  {item?.logo?.arCode === item?.operatingLogo?.arCode ? "" : `Operated By ${item?.operatingLogo?.ar}`}
+                                  {item?.logo?.arCode === item?.operatingLogo?.arCode ? "" : (item?.operatingLogo?.ar ? `Operated By ${item?.operatingLogo?.ar}` : "")}
                                 </Typography>
 
                                 {/* <Typography level="body-xs">(E6Q6M2)</Typography> */}
@@ -7382,7 +7679,7 @@ const SearchFlights = () => {
                                 <Typography level="body-xs">
                                   {
                                     openDrawer?.data?.brandedFare?.data?.[0]
-                                      ?.brandName?.[0]
+                                      ?.brandName?.[0] || openDrawer?.data?.brandedFare?.brandName
                                   }
                                 </Typography>
                               </Box>
@@ -7530,7 +7827,7 @@ const SearchFlights = () => {
                         ))}
                       </TabPanel>
                     )}
-                    {openDrawer?.data?.return && tripType !== "Multi City" && (
+                    {openDrawer?.data?.return?.length > 0 && tripType !== "Multi City" && (
                       <TabPanel value={1}>
                         <Box
                           sx={{
@@ -7641,7 +7938,7 @@ const SearchFlights = () => {
                                 </Typography>
 
                                 <Typography level="body-xs">
-                                  {item?.logo?.arCode === item?.operatingLogo?.arCode ? "" : `Operated By ${item?.operatingLogo?.ar}`}
+                                  {item?.logo?.arCode === item?.operatingLogo?.arCode ? "" : (item?.operatingLogo?.ar ? `Operated By ${item?.operatingLogo?.ar}` : "")}
                                 </Typography>
 
                                 {/* <Typography level="body-xs">(E6Q6M2)</Typography> */}
@@ -7805,7 +8102,12 @@ const SearchFlights = () => {
                         {extractTripsForMultiCity(
                           openDrawer?.data?.api?.startsWith("amad")
                             ? openDrawer?.data?.departure
-                            : openDrawer?.data?.flights,
+                            : openDrawer?.data?.api === "hitit"
+                              ? [
+                                ...(openDrawer?.data?.departure || []),
+                                ...(openDrawer?.data?.return || []),
+                              ]
+                              : openDrawer?.data?.flights,
                           multicityFlights,
                           openDrawer?.data?.api
                         )?.map((flightItem, index) => (
@@ -7925,7 +8227,7 @@ const SearchFlights = () => {
                                       sx={{ width: 100, textAlign: "center" }}
                                     >
                                       <Avatar
-                                        src={item?.departure?.logo?.logo}
+                                        src={item?.departure?.logo?.logo || item?.logo?.logo}
                                         alt={
                                           item?.departure?.logo?.code ||
                                           openDrawer?.data?.arCode
@@ -7964,7 +8266,7 @@ const SearchFlights = () => {
                                       <Typography level="body-xs">
                                         {
                                           openDrawer?.data?.brandedFare
-                                            ?.data?.[0]?.brandName?.[0]
+                                            ?.data?.[0]?.brandName?.[0] || openDrawer?.data?.brandedFare?.brandName
                                         }
                                       </Typography>
                                     </Box>
@@ -8147,7 +8449,12 @@ const SearchFlights = () => {
                           ? extractTripsForMultiCity(
                             openDrawer?.data?.api?.startsWith("amad")
                               ? openDrawer?.data?.departure
-                              : openDrawer?.data?.flights,
+                              : openDrawer?.data?.api === "hitit"
+                                ? [
+                                  ...(openDrawer?.data?.departure || []),
+                                  ...(openDrawer?.data?.return || []),
+                                ]
+                                : openDrawer?.data?.flights,
                             multicityFlights,
                             openDrawer?.data?.api
                           )?.length
@@ -8182,10 +8489,12 @@ const SearchFlights = () => {
                             sx={{
                               width: "100%",
                               height: "auto",
-                              borderRadius: "20px",
+                              borderRadius: "12px",
                               display: "flex",
-                              alignItems: "center",
+                              flexDirection: "column",
+                              alignItems: "flex-start",
                               border: "1px solid lightgrey",
+                              overflow: "hidden",
                             }}
                           >
                             {(openDrawer?.data?.api === "amadus" ||
@@ -8202,16 +8511,187 @@ const SearchFlights = () => {
                                 )}
                               </List>
                             ) : openDrawer?.data?.api === "sabre" &&
-                              openDrawer?.data?.fareRule && openDrawer?.data?.fareRule?.Summary?.PassengerDetails?.PassengerDetail?.PenaltiesInfo.Penalty ? (
-                              <List marker="disc">
-                                {openDrawer?.data?.fareRule?.Summary?.PassengerDetails?.PassengerDetail?.PenaltiesInfo.Penalty?.filter(
-                                  (item) => item?.Amount
-                                )?.map((item, index) => (
-                                  <ListItem key={index}>
-                                    {formatFareRule(item)}
-                                  </ListItem>
-                                ))}
-                              </List>
+                              openDrawer?.data?.fareRule &&
+                              (() => {
+                                const pd = openDrawer?.data?.fareRule?.Summary?.PassengerDetails?.PassengerDetail;
+                                const det = Array.isArray(pd) ? pd[0] : pd;
+                                const pens = det?.PenaltiesInfo?.Penalty;
+                                return Array.isArray(pens) && pens.length > 0;
+                              })() ? (
+                              (() => {
+                                const pd = openDrawer?.data?.fareRule?.Summary?.PassengerDetails?.PassengerDetail;
+                                const det = Array.isArray(pd) ? pd[0] : pd;
+                                const penalties = det?.PenaltiesInfo?.Penalty || [];
+                                return (
+                                  <Box sx={{ width: "100%", p: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    <Typography sx={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", mb: "2px" }}>
+                                      Penalties {"&"} Conditions
+                                    </Typography>
+                                    {penalties.map((item, index) => {
+                                      const isExchange = item?.Type === "Exchange";
+                                      const isChangeable = item?.Changeable === "true";
+                                      const isRefundable = item?.Refundable === "true";
+                                      const hasAmount = !!(item?.Amount && item?.CurrencyCode);
+                                      const badgeColor = isExchange ? "#92400e" : "#166534";
+                                      const badgeBg = isExchange ? "#fef3c7" : "#dcfce7";
+                                      const borderAccent = isExchange ? "#d97706" : "#16a34a";
+
+                                      let statusLabel = "";
+                                      let statusOk = false;
+                                      if (isExchange) {
+                                        statusOk = isChangeable;
+                                        statusLabel = isChangeable ? "Changeable" : "Not Changeable";
+                                      } else {
+                                        statusOk = isRefundable;
+                                        statusLabel = isRefundable ? "Refundable" : "Not Refundable";
+                                      }
+                                      if (hasAmount) statusLabel += ` (${item.CurrencyCode} ${Number(item.Amount).toLocaleString()})`;
+
+                                      return (
+                                        <Box
+                                          key={index}
+                                          sx={{
+                                            borderRadius: "8px",
+                                            p: "10px 14px",
+                                            backgroundColor: "#f9fafb",
+                                            border: "1px solid #e5e7eb",
+                                            borderLeft: `4px solid ${borderAccent}`,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "5px",
+                                          }}
+                                        >
+                                          <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <Box
+                                              sx={{
+                                                backgroundColor: badgeBg,
+                                                color: badgeColor,
+                                                borderRadius: "12px",
+                                                px: "8px",
+                                                py: "2px",
+                                                fontSize: "11px",
+                                                fontWeight: "700",
+                                                display: "inline-block",
+                                              }}
+                                            >
+                                              {item?.Type || "Penalty"}
+                                            </Box>
+                                            <Typography sx={{ fontSize: "13px", color: "#374151" }}>
+                                              {item?.Applicability === "Before" ? "Before Departure" : item?.Applicability === "After" ? "After Departure" : (item?.Applicability || "")}
+                                            </Typography>
+                                          </Box>
+                                          <Typography sx={{ fontSize: "13px", fontWeight: "600", color: statusOk ? "#16a34a" : "#dc2626" }}>
+                                            {statusOk ? "✓" : "✗"} {statusLabel}
+                                          </Typography>
+                                        </Box>
+                                      );
+                                    })}
+                                  </Box>
+                                );
+                              })()
+                            ) : openDrawer?.data?.api === "hitit" ? (
+                              <Box sx={{ width: "100%" }}>
+                                {loadingHititRules ? (
+                                  <Box sx={{ p: "14px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <Typography sx={{ fontSize: "14px", color: "#6b7280" }}>Loading fare rules...</Typography>
+                                  </Box>
+                                ) : hititRules?.remarks?.length > 0 ? (
+                                  <Box sx={{ width: "100%", p: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    <Typography sx={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", mb: "2px" }}>
+                                      Fare Rules {"&"} Conditions
+                                    </Typography>
+                                    {hititRules.remarks.map((rule, idx) => {
+                                      const isPenalty = rule?.ruleCode === "16" || rule?.ruleCode === "31" || rule?.ruleCode === "33";
+                                      const isBaggage = rule?.ruleCode === "23";
+                                      const borderAccent = isPenalty ? "#d97706" : isBaggage ? "#2563eb" : "#6b7280";
+                                      const badgeBg = isPenalty ? "#fef3c7" : isBaggage ? "#dbeafe" : "#f3f4f6";
+                                      const badgeColor = isPenalty ? "#92400e" : isBaggage ? "#1e40af" : "#374151";
+
+                                      return (
+                                        <Box
+                                          key={idx}
+                                          sx={{
+                                            borderRadius: "8px",
+                                            p: "10px 14px",
+                                            backgroundColor: "#f9fafb",
+                                            border: "1px solid #e5e7eb",
+                                            borderLeft: `4px solid ${borderAccent}`,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "6px",
+                                          }}
+                                        >
+                                          <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <Box
+                                              sx={{
+                                                backgroundColor: badgeBg,
+                                                color: badgeColor,
+                                                borderRadius: "12px",
+                                                px: "8px",
+                                                py: "2px",
+                                                fontSize: "11px",
+                                                fontWeight: "700",
+                                                display: "inline-block",
+                                              }}
+                                            >
+                                              {rule?.ruleCode || "—"}
+                                            </Box>
+                                            <Typography sx={{ fontSize: "13px", fontWeight: "700", color: "#111827" }}>
+                                              {rule?.title || "Rule"}
+                                            </Typography>
+                                          </Box>
+                                          {rule?.text && (
+                                            <Typography
+                                              sx={{
+                                                fontSize: "12px",
+                                                color: "#374151",
+                                                whiteSpace: "pre-wrap",
+                                                lineHeight: "1.5",
+                                                backgroundColor: "#fff",
+                                                borderRadius: "6px",
+                                                p: "8px",
+                                                border: "1px solid #e5e7eb",
+                                              }}
+                                            >
+                                              {rule.text}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      );
+                                    })}
+                                  </Box>
+                                ) : hititRules !== null ? (
+                                  /* API returned successfully but remarks array is empty */
+                                  <Box sx={{ p: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    <Box
+                                      sx={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        backgroundColor: "#dcfce7",
+                                        border: "1px solid #86efac",
+                                        borderRadius: "8px",
+                                        px: "12px",
+                                        py: "8px",
+                                        width: "fit-content",
+                                      }}
+                                    >
+                                      <Typography sx={{ fontSize: "13px", fontWeight: "700", color: "#16a34a" }}>
+                                        ✓ No Restrictions Found
+                                      </Typography>
+                                    </Box>
+                                    <Typography sx={{ fontSize: "12px", color: "#6b7280", mt: "2px" }}>
+                                      The airline returned no penalty information for this fare. This fare may be fully flexible.
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  <Box sx={{ p: "14px 16px" }}>
+                                    <Typography sx={{ fontSize: "14px", color: "#6b7280" }}>
+                                      Fare rules could not be retrieved. Please contact support.
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
                             ) : (
                               <Typography
                                 sx={{
@@ -8296,25 +8776,36 @@ const SearchFlights = () => {
                                 <Typography
                                   sx={{ fontSize: "16px", fontWeight: "500" }}
                                 >
-                                  {" "}
-                                  {openDrawer?.data?.baseFare}{" "}
+                                  {openDrawer?.data?.api === "hitit"
+                                    ? openDrawer?.data?.totalFare -
+                                    openDrawer?.data?.totalTax
+                                    : openDrawer?.data?.baseFare}{" "}
                                 </Typography>
                               </Typography>
                             </Box>
                             {openDrawer?.data?.extra &&
                               Object?.entries(openDrawer?.data?.extra)?.map(
                                 ([type, data]) => {
-                                  if (data?.count && data.Price) {
-                                    const unitPrice = (
-                                      data.Price /
-                                      data.count /
-                                      1000
-                                    )
-                                      .toFixed(3)
-                                      ?.replace(".", ""); // Adjust divisor if needed
-                                    const totalPrice = (data.Price / 1000)
-                                      .toFixed(3)
-                                      ?.replace(".", ""); // Assuming price is in Baisa (1000 Baisa = 1 OMR)
+                                  if ((openDrawer?.data?.api === "hitit" &&
+                                    data?.count &&
+                                    data?.amount) ||
+                                    (data?.count && data?.Price)) {
+                                    const isHitit =
+                                      openDrawer?.data?.api === "hitit";
+                                    const price = isHitit
+                                      ? data.amount
+                                      : data.Price;
+
+                                    const unitPrice = isHitit
+                                      ? (price / data.count).toFixed(0)
+                                      : (price / data.count / 1000)
+                                        .toFixed(3)
+                                        ?.replace(".", ""); // Adjust divisor if needed
+                                    const totalPrice = isHitit
+                                      ? price
+                                      : (price / 1000)
+                                        .toFixed(3)
+                                        ?.replace(".", ""); // Assuming price is in Baisa (1000 Baisa = 1 OMR)
 
                                     return (
                                       <Box
@@ -8360,12 +8851,13 @@ const SearchFlights = () => {
                               <Typography sx={{ fontSize: "10px" }}>
                                 RS{" "}
                                 <Typography sx={{ fontSize: "16px" }}>
-                                  {" "}
-                                  {openDrawer?.data?.taxSummaries?.reduce(
-                                    (acc, tax) =>
-                                      acc + (parseFloat(tax.amount) || 0),
-                                    0
-                                  ) || 0}{" "}
+                                  {openDrawer?.data?.api === "hitit"
+                                    ? openDrawer?.data?.totalTax
+                                    : openDrawer?.data?.taxSummaries?.reduce(
+                                      (acc, tax) =>
+                                        acc + (parseFloat(tax.amount) || 0),
+                                      0
+                                    ) || 0}{" "}
                                 </Typography>
                               </Typography>
                               {console.log(openDrawer?.data, "open", openDrawer)}
@@ -8425,7 +8917,12 @@ const SearchFlights = () => {
                           ? extractTripsForMultiCity(
                             openDrawer?.data?.api?.startsWith("amad")
                               ? openDrawer?.data?.departure
-                              : openDrawer?.data?.flights,
+                              : openDrawer?.data?.api === "hitit"
+                                ? [
+                                  ...(openDrawer?.data?.departure || []),
+                                  ...(openDrawer?.data?.return || []),
+                                ]
+                                : openDrawer?.data?.flights,
                             multicityFlights,
                             openDrawer?.data?.api
                           )?.length + 1
@@ -8477,42 +8974,62 @@ const SearchFlights = () => {
                               />
                               <Box sx={{ ml: 2, textAlign: "left" }}>
                                 <Typography level="h4">Check-in</Typography>
-                                {passengerTypes.map((type) => {
-                                  const count =
-                                    openDrawer?.data?.extra?.[type]?.count;
-                                  if (count > 0) {
+                                {openDrawer?.data?.api === "hitit" ? (
+                                  (() => {
+                                    const bagInfo = openDrawer?.data?.brandedFare?.baggageInformation;
+                                    const bagText = bagInfo && bagInfo.length > 0
+                                      ? `${bagInfo[0].weight} ${bagInfo[0].unit}`
+                                      : "No Baggage Info";
                                     return (
-                                      <Typography
-                                        fontSize="sm"
-                                        key={`${type}-checkin`}
-                                      >
-                                        {type.charAt(0).toUpperCase() +
-                                          type.slice(1)}
-                                        :{" "}
-                                        {getCheckinText(type, openDrawer?.data)}
+                                      <Typography fontSize="sm">
+                                        Adult: {bagText}
                                       </Typography>
                                     );
-                                  }
-                                  return null;
-                                })}
+                                  })()
+                                ) : (
+                                  passengerTypes.map((type) => {
+                                    const count =
+                                      openDrawer?.data?.extra?.[type]?.count;
+                                    if (count > 0) {
+                                      return (
+                                        <Typography
+                                          fontSize="sm"
+                                          key={`${type}-checkin`}
+                                        >
+                                          {type.charAt(0).toUpperCase() +
+                                            type.slice(1)}
+                                          :{" "}
+                                          {getCheckinText(type, openDrawer?.data)}
+                                        </Typography>
+                                      );
+                                    }
+                                    return null;
+                                  })
+                                )}
                                 <Typography level="h4">Cabin</Typography>
-                                {passengerTypes.map((type) => {
-                                  const count =
-                                    openDrawer?.data?.extra?.[type]?.count;
-                                  if (count > 0) {
-                                    return (
-                                      <Typography
-                                        fontSize="sm"
-                                        key={`${type}-cabin`}
-                                      >
-                                        {type.charAt(0).toUpperCase() +
-                                          type.slice(1)}
-                                        : {getCabinText(type, openDrawer?.data)}
-                                      </Typography>
-                                    );
-                                  }
-                                  return null;
-                                })}
+                                {openDrawer?.data?.api === "hitit" ? (
+                                  <Typography fontSize="sm">
+                                    Adult: 7 KG
+                                  </Typography>
+                                ) : (
+                                  passengerTypes.map((type) => {
+                                    const count =
+                                      openDrawer?.data?.extra?.[type]?.count;
+                                    if (count > 0) {
+                                      return (
+                                        <Typography
+                                          fontSize="sm"
+                                          key={`${type}-cabin`}
+                                        >
+                                          {type.charAt(0).toUpperCase() +
+                                            type.slice(1)}
+                                          : {getCabinText(type, openDrawer?.data)}
+                                        </Typography>
+                                      );
+                                    }
+                                    return null;
+                                  })
+                                )}
                               </Box>
                             </Box>
                           </Box>
@@ -8521,12 +9038,12 @@ const SearchFlights = () => {
                         </>
                       ))}
 
-                      {openDrawer?.data?.return &&
+                      {openDrawer?.data?.return?.length > 0 &&
                         tripType !== "Multi City" && (
                           <Typography level="h3">RETURN</Typography>
                         )}
 
-                      {openDrawer?.data?.return &&
+                      {openDrawer?.data?.return?.length > 0 &&
                         tripType !== "Multi City" &&
                         openDrawer?.data?.return?.map((item, index) => (
                           <>
@@ -8570,46 +9087,66 @@ const SearchFlights = () => {
                                 />
                                 <Box sx={{ ml: 2, textAlign: "left" }}>
                                   <Typography level="h4">Check-in</Typography>
-                                  {passengerTypes.map((type) => {
-                                    const count =
-                                      openDrawer?.data?.extra?.[type]?.count;
-                                    if (count > 0) {
+                                  {openDrawer?.data?.api === "hitit" ? (
+                                    (() => {
+                                      const bagInfo = openDrawer?.data?.brandedFare?.baggageInformation;
+                                      const bagText = bagInfo && bagInfo.length > 0
+                                        ? `${bagInfo[0].weight} ${bagInfo[0].unit}`
+                                        : "No Baggage Info";
                                       return (
-                                        <Typography
-                                          fontSize="sm"
-                                          key={`${type}-checkin`}
-                                        >
-                                          {type.charAt(0).toUpperCase() +
-                                            type.slice(1)}
-                                          :{" "}
-                                          {getCheckinText(
-                                            type,
-                                            openDrawer?.data
-                                          )}
+                                        <Typography fontSize="sm">
+                                          Adult: {bagText}
                                         </Typography>
                                       );
-                                    }
-                                    return null;
-                                  })}
+                                    })()
+                                  ) : (
+                                    passengerTypes.map((type) => {
+                                      const count =
+                                        openDrawer?.data?.extra?.[type]?.count;
+                                      if (count > 0) {
+                                        return (
+                                          <Typography
+                                            fontSize="sm"
+                                            key={`${type}-checkin`}
+                                          >
+                                            {type.charAt(0).toUpperCase() +
+                                              type.slice(1)}
+                                            :{" "}
+                                            {getCheckinText(
+                                              type,
+                                              openDrawer?.data
+                                            )}
+                                          </Typography>
+                                        );
+                                      }
+                                      return null;
+                                    })
+                                  )}
                                   <Typography level="h4">Cabin</Typography>
-                                  {passengerTypes.map((type) => {
-                                    const count =
-                                      openDrawer?.data?.extra?.[type]?.count;
-                                    if (count > 0) {
-                                      return (
-                                        <Typography
-                                          fontSize="sm"
-                                          key={`${type}-cabin`}
-                                        >
-                                          {type.charAt(0).toUpperCase() +
-                                            type.slice(1)}
-                                          :{" "}
-                                          {getCabinText(type, openDrawer?.data)}
-                                        </Typography>
-                                      );
-                                    }
-                                    return null;
-                                  })}
+                                  {openDrawer?.data?.api === "hitit" ? (
+                                    <Typography fontSize="sm">
+                                      Adult: 7 KG
+                                    </Typography>
+                                  ) : (
+                                    passengerTypes.map((type) => {
+                                      const count =
+                                        openDrawer?.data?.extra?.[type]?.count;
+                                      if (count > 0) {
+                                        return (
+                                          <Typography
+                                            fontSize="sm"
+                                            key={`${type}-cabin`}
+                                          >
+                                            {type.charAt(0).toUpperCase() +
+                                              type.slice(1)}
+                                            :{" "}
+                                            {getCabinText(type, openDrawer?.data)}
+                                          </Typography>
+                                        );
+                                      }
+                                      return null;
+                                    })
+                                  )}
                                 </Box>
                               </Box>
                             </Box>
@@ -8629,7 +9166,7 @@ const SearchFlights = () => {
                       >
                         <Typography sx={{ fontSize: "14px", color: "grey" }}>
                           The information presented above is as obtained from
-                          the airline reservation system. INNOVATION TECH does not
+                          the airline reservation system. Al-Saboor does not
                           guarantee the accuracy of this information. The
                           baggage allowance may vary according to stop-overs,
                           connecting flights and changes in airline rules.

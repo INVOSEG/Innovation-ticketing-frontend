@@ -182,7 +182,7 @@ export default function Sidebar() {
           <img src={AlasamLogo} style={{ width: '200px', height: '100px' }} />}
 
         {console.log("logo is ", `${NEXT_PUBLIC_PROD_IMAGE_URL}${userData?.logo}`)}
-        {/* <Typography level="title-lg">INNOVATION TECH.</Typography> */}
+        {/* <Typography level="title-lg">Al-Saboor.</Typography> */}
         {/* <ColorSchemeToggle sx={{ ml: 'auto' }} /> */}
       </Box>
       {/* <Input size="sm" startDecorator={<SearchRoundedIcon />} placeholder="Search" /> */}

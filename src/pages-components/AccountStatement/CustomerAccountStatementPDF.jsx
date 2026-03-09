@@ -92,7 +92,7 @@ const CustomerAccountStatementPDF = ({ confirmedData, refundedData, paymentData,
                   <View style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", height: "70px" }}>
                      <View style={{ width: "50%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "5px" }}>
                         <Text style={{ fontSize: "10px" }}>Account:  60041</Text>
-                        <Text style={{ fontSize: "10px" }}>Account Name: INNOVATION TECH TRAVEL AND TOURISM</Text>
+                        <Text style={{ fontSize: "10px" }}>Account Name: Al-Saboor TRAVEL AND TOURISM</Text>
                         <Text style={{ fontSize: "10px" }}>Statement Period: {startDate} to {endDate}</Text>
                      </View>
 

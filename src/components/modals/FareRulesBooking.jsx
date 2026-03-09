@@ -18,6 +18,151 @@ import CloseIcon from "@mui/icons-material/Close"
 export default function FareRulesModal({ open, onClose, fareData }) {
     if (!fareData) return null
 
+    // Check for Hitit structure (has `remarks` array from the mapper)
+    if (fareData.remarks !== undefined) {
+        const remarks = fareData.remarks || [];
+        return (
+            <Modal open={open} onClose={onClose}>
+                <ModalDialog
+                    aria-labelledby="fare-modal-title"
+                    size="lg"
+                    sx={{
+                        width: 680,
+                        maxWidth: "95vw",
+                        borderRadius: "md",
+                        boxShadow: "lg",
+                    }}
+                >
+                    <DialogTitle id="fare-modal-title" sx={{ pb: 1 }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Box>
+                                <Typography level="h2" sx={{ fontSize: "lg", fontWeight: "lg" }}>
+                                    Fare Summary &amp; Rules
+                                </Typography>
+                                {fareData.airlineCode && (
+                                    <Typography level="body-sm" sx={{ color: "neutral.500", mt: 0.25 }}>
+                                        Airline: {fareData.airlineCode}
+                                    </Typography>
+                                )}
+                            </Box>
+                            <Button
+                                variant="plain"
+                                color="neutral"
+                                size="sm"
+                                onClick={onClose}
+                                sx={{ borderRadius: "50%", minWidth: "auto" }}
+                            >
+                                <CloseIcon />
+                            </Button>
+                        </Box>
+                    </DialogTitle>
+
+                    <Divider sx={{ my: 1 }} />
+
+                    <DialogContent sx={{ maxHeight: "72vh", overflowY: "auto", px: 3 }}>
+                        <Stack spacing={2}>
+                            <Typography
+                                level="h3"
+                                sx={{
+                                    fontSize: "sm",
+                                    fontWeight: "bold",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.08em",
+                                    opacity: 0.65,
+                                    mb: 0.5,
+                                }}
+                            >
+                                Fare Rules &amp; Conditions
+                            </Typography>
+
+                            {remarks.length > 0 ? (
+                                remarks.map((rule, idx) => {
+                                    const isPenalty = ["16", "31", "33"].includes(rule?.ruleCode);
+                                    const isBaggage = rule?.ruleCode === "23";
+                                    const borderColor = isPenalty
+                                        ? "var(--joy-palette-warning-400, #d97706)"
+                                        : isBaggage
+                                            ? "var(--joy-palette-primary-400, #2563eb)"
+                                            : "var(--joy-palette-neutral-300, #9ca3af)";
+                                    const chipColor = isPenalty ? "warning" : isBaggage ? "primary" : "neutral";
+
+                                    return (
+                                        <Card
+                                            key={idx}
+                                            variant="outlined"
+                                            sx={{
+                                                borderLeft: `4px solid ${borderColor}`,
+                                                backgroundColor: "var(--joy-palette-background-level1)",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {/* Header row: badge + title */}
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                                <Chip size="sm" variant="solid" color={chipColor}>
+                                                    {rule?.ruleCode || "—"}
+                                                </Chip>
+                                                <Typography level="body-md" sx={{ fontWeight: "bold", color: "text.primary" }}>
+                                                    {rule?.title || "Rule"}
+                                                </Typography>
+                                            </Box>
+
+                                            {/* Rule text */}
+                                            {rule?.text && (
+                                                <Typography
+                                                    level="body-xs"
+                                                    sx={{
+                                                        whiteSpace: "pre-wrap",
+                                                        lineHeight: 1.6,
+                                                        color: "text.secondary",
+                                                        backgroundColor: "var(--joy-palette-background-surface)",
+                                                        borderRadius: "sm",
+                                                        p: 1.5,
+                                                        border: "1px solid",
+                                                        borderColor: "divider",
+                                                        fontFamily: "inherit",
+                                                    }}
+                                                >
+                                                    {rule.text}
+                                                </Typography>
+                                            )}
+                                        </Card>
+                                    );
+                                })
+                            ) : (
+                                <Box
+                                    sx={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        backgroundColor: "success.softBg",
+                                        border: "1px solid",
+                                        borderColor: "success.outlinedBorder",
+                                        borderRadius: "md",
+                                        px: 2,
+                                        py: 1.5,
+                                    }}
+                                >
+                                    <Typography level="body-sm" sx={{ fontWeight: "bold", color: "success.700" }}>
+                                        ✓ No Restrictions Found
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Stack>
+                    </DialogContent>
+
+                    <Divider />
+
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, p: 2 }}>
+                        <Button variant="plain" color="neutral" onClick={onClose}>
+                            Close
+                        </Button>
+                    </Box>
+                </ModalDialog>
+            </Modal>
+        );
+    }
+
+
     const passenger = fareData?.Summary?.PassengerDetails?.PassengerDetail
     const totalPrice = fareData?.Summary?.Total
     const baseFare = passenger?.PassengerFare?.BaseFare

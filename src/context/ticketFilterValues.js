@@ -37,7 +37,8 @@ export const TicketFilterProvider = ({ children }) => {
     const [nearByAirport, setNearByAirport] = useState(true);
     const [onwardClass, setOnwardClass] = useState('Economy');
     const [returnClass, setReturnClass] = useState('Economy');
-    const [gdsSelection, setGdsSelection] = useState('Sabre');
+    const [gdsSelection, setGdsSelection] = useState('Both');
+
     const [departDate, setDepartDate] = useState(new Date());
     const [toLocation, setToLocation] = useState({
         code: 'JED',

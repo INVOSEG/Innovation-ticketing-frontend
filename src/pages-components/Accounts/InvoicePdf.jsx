@@ -112,7 +112,7 @@ const InvoicePdf = ({ ticketInf, hotelInf, visaInf, otherInf, genInf, allTotals 
     <Document>
       <Page size="A4" >
         <View style={{ width: "100%", height: "150px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px" }}>
-          <Text style={{ fontWeight: 500, fontSize: "20px" }}>INNOVATION TECH TRAVEL AND TOURISM</Text>
+          <Text style={{ fontWeight: 500, fontSize: "20px" }}>Al-Saboor TRAVEL AND TOURISM</Text>
           <View>
             <Text style={{ fontSize: "12px" }}>Johar Town , Lahore</Text>
             <Text style={{ fontSize: "12px" }}>Phone: 052-4268155-56-57</Text>
@@ -185,7 +185,7 @@ const InvoicePdf = ({ ticketInf, hotelInf, visaInf, otherInf, genInf, allTotals 
                 </View>
                 <View style={{ display: "flex", justifyContent: "space-between", flexDirection: "row" }}>
                   <Text style={{ fontSize: "10px", marginTop: "20px", borderBottom: "1px solid black" }}>This is computer generated invoice and does not require any stamp or signature</Text>
-                  <Text style={{ fontSize: "10px", marginTop: "20px", }}>For INNOVATION TECH TARVEL AND TOURISM</Text>
+                  <Text style={{ fontSize: "10px", marginTop: "20px", }}>For Al-Saboor TARVEL AND TOURISM</Text>
 
                 </View>
                 <Text style={{ fontSize: "10px", marginTop: "20px", }}>Acknowledgment</Text>

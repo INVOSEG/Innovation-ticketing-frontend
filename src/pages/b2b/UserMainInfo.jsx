@@ -652,7 +652,7 @@ export default function UserManagement() {
             </thead>
             {agencies.length > 0 && (
               <tbody>
-                {stableSort(agencies, getComparator(order, "userName"))?.map(
+                {agencies?.map(
                   (row) => (
                     <tr key={row?.agencyName}>
                       {/* <td>

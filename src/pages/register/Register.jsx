@@ -93,7 +93,7 @@ export default function AppRegister() {
               {/* <IconButton variant="soft" color="primary" size="sm">
                 <BadgeRoundedIcon />
               </IconButton> */}
-              <Typography level="title-lg">INNOVATION TECH</Typography>
+              <Typography level="title-lg">Al-Saboor</Typography>
             </Box>
             {/* <ColorSchemeToggle /> */}
           </Box>
@@ -197,7 +197,7 @@ export default function AppRegister() {
           </Box>
           <Box component="footer" sx={{ py: 3 }}>
             <Typography level="body-xs" textAlign="center">
-              © INNOVATION TECH {new Date().getFullYear()}
+              © Al-Saboor {new Date().getFullYear()}
             </Typography>
           </Box>
         </Box>

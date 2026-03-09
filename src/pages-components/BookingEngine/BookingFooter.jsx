@@ -153,10 +153,10 @@ const BookingFooter = () => {
 
           <Box sx={{ width: "100%", textAlign: "center", pt: "10px" }}>
             <Typography sx={{ color: "white" }}>
-              INNOVATION TECH / Flight Network UK Ltd, Unit 112854, PO Box 6945, London, W1A 6US, United Kingdom
+              Al-Saboor / Flight Network UK Ltd, Unit 112854, PO Box 6945, London, W1A 6US, United Kingdom
             </Typography>
             <Typography sx={{ color: "white", mt: "5px" }}>
-              © 2024 INNOVATION TECH. All Rights Reserved.
+              © 2024 Al-Saboor. All Rights Reserved.
             </Typography>
           </Box>
         </Box>

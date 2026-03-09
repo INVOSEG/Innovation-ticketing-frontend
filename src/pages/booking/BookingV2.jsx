@@ -35,7 +35,12 @@ import {
   submitSabreBookingMRequest,
   submitSabreBookingRequest,
   viewItinary,
+  hititBookFlight,
+  hititIssueTicket,
+  hititFareRules,
 } from "../../server/api";
+
+
 import {
   cnicRegex,
   emailRegex,
@@ -144,7 +149,7 @@ const RenderTravelerContactForm = React.memo(
   }
 );
 
-const FlightInfo = ({ flight, isReturn, logo, name, index, fareOffers }) => (
+const FlightInfo = ({ flight, isReturn, logo, name, index, fareOffers, selectedBrandedFare, isHitit }) => (
   <>
     <Grid container spacing={2}>
       <Grid
@@ -300,13 +305,22 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, fareOffers }) => (
           <Typography level="h4">Baggage Detail</Typography>
           <Typography level="body-md">
             <b>CHECK IN:</b>{" "}
-            {fareOffers?.[0]?.checkedBaggageAllowance?.totalWeightInKilograms}{" "}
-            KG
+            {isHitit ? (
+              (() => {
+                const bagInfo = selectedBrandedFare?.baggageInformation;
+                return bagInfo && bagInfo.length > 0
+                  ? `${bagInfo[0].weight} ${bagInfo[0].unit}`
+                  : "No Baggage Info";
+              })()
+            ) : (
+              <>{fareOffers?.[0]?.checkedBaggageAllowance?.totalWeightInKilograms} KG</>
+            )}
           </Typography>
-          {(fareOffers?.[0]?.cabinBaggageAllowance?.baggagePieces?.[0]
-            ?.maximumWeightInKilograms ||
-            fareOffers?.[0]?.cabinBaggageAllowance?.baggagePieces?.[0]
-              ?.maximumWeightInKilograms) && (
+          {!isHitit &&
+            (fareOffers?.[0]?.cabinBaggageAllowance?.baggagePieces?.[0]
+              ?.maximumWeightInKilograms ||
+              fareOffers?.[0]?.cabinBaggageAllowance?.baggagePieces?.[0]
+                ?.maximumWeightInKilograms) && (
               <Typography level="body-md">
                 <b>CABIN:</b>{" "}
                 {fareOffers?.[0]?.cabinBaggageAllowance?.baggagePieces?.[0]
@@ -319,6 +333,11 @@ const FlightInfo = ({ flight, isReturn, logo, name, index, fareOffers }) => (
                 KG
               </Typography>
             )}
+          {isHitit && (
+            <Typography level="body-md">
+              <b>CABIN:</b> 7 KG
+            </Typography>
+          )}
         </Box>
       </Grid>
     </Grid>
@@ -798,13 +817,13 @@ const DurationTooltip = ({ data, apiName, isMultiCity }) => {
                     item?.logo?.code ===
                       item?.operatingLogo?.code
                       ? ""
-                      : "Operated By " +
-                      item?.operatingLogo?.code
+                      : (item?.operatingLogo?.code) ? "Operated By " +
+                        item?.operatingLogo?.code : ""
                     : item?.marketing ===
                       item?.operatingLogo?.arCode
                       ? ""
-                      : "Operated By: " +
-                      item?.operatingLogo?.ar}
+                      : (item?.operatingLogo?.ar) ? "Operated By: " +
+                        item?.operatingLogo?.ar : ""}
                 </Typography>
               </Box>
               <Typography>
@@ -987,7 +1006,8 @@ const BookingV2 = () => {
   const [psfValue, setPsfValue] = useState("");
   const [printOption, setPrintOption] = useState("with");
   const [expanded, setExpanded] = React.useState(true);
-  const [timeLeft, setTimeLeft] = React.useState({ minutes: 19, seconds: 55 });
+  const isHitit = flight?.api?.toLowerCase() === "hitit";
+  const [timeLeft, setTimeLeft] = React.useState(isHitit ? { minutes: 9, seconds: 55 } : { minutes: 19, seconds: 55 });
   const [hideItineraryCard, setHideItineraryCard] = useState(false);
   const [passenger, setPassenger] = useState({
     title: "mr",
@@ -1064,21 +1084,42 @@ const BookingV2 = () => {
 
     try {
       setLoading1(true); // Start loading
-      const res = await getSabreFareRules({ ...flightData }); // Await API
-      if (
-        res?.result?.rawResponse?.["soap-env:Envelope"]?.["soap-env:Body"]
-          ?.StructureFareRulesRS?.Errors
-      ) {
-        enqueueSnackbar(`Fare rules not found for this booking.`, {
-          variant: "info",
-        });
-        return;
+
+      if (flight?.api === "hitit" || flightData?.api === "hitit") {
+        const payload = {
+          airlineCode: flight?.departure?.[0]?.marketing || flight?.departure?.[0]?.marketingCarrier || flight?.validatingCarrier || flight?.arCode,
+          origin: flight?.departure?.[0]?.departureLocation,
+          destination: flight?.departure?.[flight?.departure?.length - 1]?.arrivalLocation,
+          departureDate: flight?.departure?.[0]?.departureTime,
+          fareBasisCode: selectedBrandedFare?.fareBasisCode || selectedBrandedFare?.bookingCode || brandedFare || flight?.brandedFare?.fareBasisCode || flight?.brandedFare?.bookingCode,
+          currency: flight?.currency || "PKR"
+        };
+        const res = await hititFareRules(payload);
+        if (res && res.result) {
+          setFareRules(res.result);
+          setModalOpen(true);
+        } else {
+          enqueueSnackbar(`Fare rules not found for this booking.`, {
+            variant: "info",
+          });
+        }
+      } else {
+        const res = await getSabreFareRules({ ...flightData }); // Await API
+        if (
+          res?.result?.rawResponse?.["soap-env:Envelope"]?.["soap-env:Body"]
+            ?.StructureFareRulesRS?.Errors
+        ) {
+          enqueueSnackbar(`Fare rules not found for this booking.`, {
+            variant: "info",
+          });
+          return;
+        }
+        setFareRules(
+          res?.result?.rawResponse?.["soap-env:Envelope"]?.["soap-env:Body"]
+            ?.StructureFareRulesRS
+        ); // Store response in state
+        setModalOpen(true); // Open modal
       }
-      setFareRules(
-        res?.result?.rawResponse?.["soap-env:Envelope"]?.["soap-env:Body"]
-          ?.StructureFareRulesRS
-      ); // Store response in state
-      setModalOpen(true); // Open modal
     } catch (err) {
       console.error("Fare rules error", err);
     } finally {
@@ -1710,12 +1751,102 @@ const BookingV2 = () => {
         pnr =
           sabreRes?.result?.CreatePassengerNameRecordRS?.ItineraryRef?.ID ||
           sabreRes?.result?.id;
+      } else if (flight.api?.toLowerCase() === "hitit") {
+        const contactInfoID = "Contact-1";
+        const contactInfoList = [{
+          contactInfoID: contactInfoID,
+          emailAddress: travellerEmail,
+          phone: {
+            areaCodeNumber: "",
+            countryDialingCode: countryCode || "92",
+            phoneNumber: travellerPhone?.slice(2) || "4443322"
+          }
+        }];
+
+        const paxList = travelers.map((t, i) => ({
+          paxID: `PAX-${i + 1}`,
+          ptc: t.type === "Adult" ? "ADT" : t.type === "Child" ? "CHD" : "INF",
+          birthdate: t.dob ? t.dob.toISOString().split("T")[0] : "1990-01-01",
+          citizenshipCountryCode: "PK", // You might want to map this from t.nationality
+          contactInfoRefID: contactInfoID,
+          identityDoc: {
+            identityDocID: t.documentNo || "3740214078980",
+            identityDocTypeCode: "NATIONAL_ID"
+          },
+          individual: {
+            genderCode: t.gender === "Male" ? "M" : "F",
+            givenName: (t.fullName?.split(" ")[0] || "TEST").toUpperCase(),
+            surname: (t.lastName || "USER").toUpperCase(),
+            titleName: t.title?.toUpperCase() || "MR",
+            individualID: `IND-${i + 1}`
+          }
+        }));
+
+        const selectedOfferItems = paxList.map((pax) => ({
+          offerItemRefId: selectedBrandedFare?.offerItemRefId || flight?.offerItemRefId || "OfferItem-3", // Defaulting to example if missing, needs dynamic value
+          paxRefId: pax.paxID
+        }));
+
+        const hititBody = {
+          offerRefId: selectedBrandedFare?.offerId || flight?.reference,
+          ownerCode: "PK",
+          totalAmount: Number(flight?.totalFare || 22520),
+          currency: "PKR",
+          selectedOfferItems,
+          contactInfoList,
+          paxList,
+          meal: selectedBrandedFare?.meal
+        };
+
+        const hititRes = await hititBookFlight(hititBody);
+
+        // Hitit returns { code, message } on errors — surface the real message
+        if (hititRes?.code && hititRes.code >= 400) {
+          dispatch(setLoading(false));
+          enqueueSnackbar(hititRes.message || "Booking failed. Please try again.", { variant: "error" });
+          return;
+        }
+
+        const bookingID = hititRes?.result?.bookingID || hititRes?.result?.data?.bookingID;
+
+        if (bookingID) {
+          const issueTicketBody = {
+            orderId: bookingID,
+            ownerCode: "PK",
+            currency: "PKR",
+            paymentFunctions: {
+              paymentProcessingDetails: {
+                amount: `${flight?.totalFare || 22520}`,
+                currency: "PKR",
+                paymentMethod: {
+                  accountableDoc: {
+                    docType: "MCO",
+                    ticketId: "4000011567" // Hardcoded as per request/example. Needs dynamic source if available.
+                  }
+                },
+                paymentRefID: "PaymentInfo1",
+                typeCode: "MCO"
+              }
+            }
+          };
+
+          console.log("Hitit Issue Ticket Body:", JSON.stringify(issueTicketBody, null, 2));
+          const issueRes = await hititIssueTicket(issueTicketBody);
+          res = issueRes;
+          pnr = bookingID;
+        } else {
+          res = hititRes;
+          pnr = "UNKNOWN_PNR";
+        }
       } else {
         res = await bookAndIssue("flights", body); // Assign response to res
         pnr = res?.result?.data?.id || res?.result?.id;
       }
 
-      await addPSF({ pnr, psfValue, type: markupPreference });
+      // REMOVE THIS IF CONDITION AND ONLY USE ADDPSF FUNCTION LATER
+      if (flight.api?.toLowerCase() !== "hitit") {
+        await addPSF({ pnr, psfValue, type: markupPreference });
+      }
 
       // if (flight.api === "sabre") {
 
@@ -1757,7 +1888,9 @@ const BookingV2 = () => {
       setOpenCreditModal({ value: true, pnr: pnr });
     } catch (error) {
       dispatch(setLoading(false));
-      enqueueSnackbar(`Something went wrong ${error}`, { variant: "error" });
+      // error may be: { code, message } from API, an Error object, or a string
+      const errMsg = error?.message || (typeof error === "string" ? error : "Something went wrong");
+      enqueueSnackbar(errMsg, { variant: "error" });
     } finally {
       dispatch(setLoading(false));
     }
@@ -1835,12 +1968,73 @@ const BookingV2 = () => {
         pnr =
           sabreRes?.result?.CreatePassengerNameRecordRS?.ItineraryRef?.ID ||
           sabreRes?.result?.id;
+      } else if (flight.api?.toLowerCase() === "hitit") {
+        const contactInfoID = "Contact-1";
+        const contactInfoList = [{
+          contactInfoID: contactInfoID,
+          emailAddress: travellerEmail,
+          phone: {
+            areaCodeNumber: "",
+            countryDialingCode: countryCode || "92",
+            phoneNumber: travellerPhone?.slice(2) || "4443322"
+          }
+        }];
+
+        const paxList = travelers.map((t, i) => ({
+          paxID: `PAX-${i + 1}`,
+          ptc: t.type === "Adult" ? "ADT" : t.type === "Child" ? "CHD" : "INF",
+          birthdate: t.dob ? t.dob.toISOString().split("T")[0] : "1990-01-01",
+          citizenshipCountryCode: "PK", // You might want to map this from t.nationality
+          contactInfoRefID: contactInfoID,
+          identityDoc: {
+            identityDocID: t.documentNo || "3740214078980",
+            identityDocTypeCode: "NATIONAL_ID"
+          },
+          individual: {
+            genderCode: t.gender === "Male" ? "M" : "F",
+            givenName: (t.fullName?.split(" ")[0] || "TEST").toUpperCase(),
+            surname: (t.lastName || "USER").toUpperCase(),
+            titleName: t.title?.toUpperCase() || "MR",
+            individualID: `IND-${i + 1}`
+          }
+        }));
+
+        const selectedOfferItems = paxList.map((pax) => ({
+          offerItemRefId: selectedBrandedFare?.offerItemRefId || flight?.offerItemRefId || "OfferItem-3", // Defaulting to example if missing, needs dynamic value
+          paxRefId: pax.paxID
+        }));
+
+        const hititBody = {
+          offerRefId: selectedBrandedFare?.offerId || flight?.reference,
+          ownerCode: "PK",
+          totalAmount: Number(flight?.totalFare || 22520),
+          currency: "PKR",
+          selectedOfferItems,
+          contactInfoList,
+          paxList,
+          meal: selectedBrandedFare?.meal
+        };
+
+        const hititRes = await hititBookFlight(hititBody);
+
+        // Hitit returns { code, message } on errors — surface the real message
+        if (hititRes?.code && hititRes.code >= 400) {
+          dispatch(setLoading(false));
+          enqueueSnackbar(hititRes.message || "Booking failed. Please try again.", { variant: "error" });
+          return;
+        }
+
+        res = hititRes;
+        pnr = hititRes?.result?.bookingID || hititRes?.result?.data?.bookingID;
       } else {
         res = await submitBookingRequest(body); // Assign response to res
         pnr = res?.result?.data?.id || res?.result?.id;
       }
 
-      await addPSF({ pnr, psfValue, type: markupPreference });
+      // REMOVE THIS IF CONDITION AND ONLY USE ADDPSF FUNCTION LATER
+      if (flight.api?.toLowerCase() !== "hitit") {
+        await addPSF({ pnr, psfValue, type: markupPreference });
+      }
 
       dispatch(setLoading(false));
       dispatch(setDashboardOption("Flight Booking"));
@@ -1863,7 +2057,9 @@ const BookingV2 = () => {
       navigate("/");
     } catch (error) {
       dispatch(setLoading(false));
-      enqueueSnackbar(`Something went wrong ${error}`, { variant: "error" });
+      // error may be: { code, message } from API, an Error object, or a string
+      const errMsg = error?.message || (typeof error === "string" ? error : "Something went wrong");
+      enqueueSnackbar(errMsg, { variant: "error" });
     } finally {
       dispatch(setLoading(false));
     }
@@ -1899,7 +2095,7 @@ const BookingV2 = () => {
   };
 
   const showTravelLocation = (data) => {
-    if (data?.return) {
+    if (data?.return?.length) {
       return `${data?.departure?.[0]?.departureLocation} → ${data?.return?.[0]?.departureLocation} → ${data?.departure?.[0]?.departureLocation}`;
     }
 
@@ -1916,6 +2112,20 @@ const BookingV2 = () => {
   };
 
   const passengerTypes = ["adult", "child", "infants"];
+
+  // Pakistani domestic airport codes
+  const pakistanAirports = new Set([
+    "KHI", "LHE", "ISB", "PEW", "MUX", "SKT", "UET", "LYP", "BHV",
+    "SWN", "TUK", "GWD", "PJG", "ORW", "DDU", "RYK", "MFG", "ATG",
+    "REQ", "WAF", "SYW", "CJL", "CHB", "SKZ", "DBA", "KDD", "BNP",
+    "ZIZ", "PAJ", "RZS", "OHT", "TLB", "KCF", "GIL", "SBQ", "DSK",
+  ]);
+
+  const isDomesticPakistan = (() => {
+    const dep = flight?.departure?.[0]?.departureLocation?.toUpperCase();
+    const arr = flight?.departure?.[flight?.departure?.length - 1]?.arrivalLocation?.toUpperCase();
+    return dep && arr && pakistanAirports.has(dep) && pakistanAirports.has(arr);
+  })();
 
   useEffect(() => {
     setCountries(Country.getAllCountries());
@@ -1943,11 +2153,10 @@ const BookingV2 = () => {
             dob: null,
             title: "",
             nationality: "",
-            documentType: "",
+            documentType: isDomesticPakistan ? "National ID" : "",
             documentNo: "",
             passportExpiryDate: "",
             passportIssuanceCountry: "",
-            gender: "",
           }))
         : [];
 
@@ -1993,6 +2202,7 @@ const BookingV2 = () => {
   // }, []);
 
   React.useEffect(() => {
+    const totalSeconds = isHitit ? 10 * 60 : 20 * 60;
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         let newMinutes = prev.minutes;
@@ -2010,7 +2220,8 @@ const BookingV2 = () => {
           return { minutes: 0, seconds: 0 };
         }
 
-        if (newMinutes === 4 && newSeconds === 0 && !timerModal) {
+        // For non-Hitit only: show "More Time" modal at 4 min remaining
+        if (!isHitit && newMinutes === 4 && newSeconds === 0 && !timerModal) {
           setTimerModal(true);
         }
 
@@ -2229,10 +2440,10 @@ const BookingV2 = () => {
                                 </Typography>
                                 <Typography level="body-xs">
                                   {flight.arCode ===
-                                    flight?.departure?.[0].operatingLogo?.ar
+                                    flight?.departure?.[0]?.operatingLogo?.ar
                                     ? ""
-                                    : "Operated By " +
-                                    flight?.departure?.[0].operatingLogo?.ar}
+                                    : (flight?.departure?.[0]?.operatingLogo?.ar ? "Operated By " +
+                                      flight?.departure?.[0]?.operatingLogo?.ar : "")}
                                 </Typography>
                                 {/* <Typography level="body-xs">SV 8732</Typography> */}
 
@@ -2253,7 +2464,7 @@ const BookingV2 = () => {
                               level="body-xs"
                               sx={{ textAlign: "start" }}
                             >
-                              {selectedBrandedFare?.data?.[0]?.brandName?.[0] ||
+                              {selectedBrandedFare?.data?.[0]?.brandName?.[0] || selectedBrandedFare?.brandName ||
                                 "N/A"}
                             </Typography>
                             <Divider
@@ -2478,43 +2689,63 @@ const BookingV2 = () => {
                                 </Typography>
                                 <Typography level="body-md">
                                   <b>CHECK IN:</b>
-                                  {passengerTypes.map((type) => {
-                                    const count = flight?.extra?.[type]?.count;
-                                    if (count > 0) {
-                                      return (
-                                        <Typography
-                                          fontSize="sm"
-                                          key={`${type}-checkin`}
-                                        >
-                                          <br />
-                                          {type.charAt(0).toUpperCase() +
-                                            type.slice(1)}
-                                          : {getCheckinText(type, flight)}
-                                        </Typography>
-                                      );
-                                    }
-                                    return null;
-                                  })}
+                                  {isHitit ? (
+                                    <Typography fontSize="sm">
+                                      <br />
+                                      Adult:{" "}
+                                      {(() => {
+                                        const bagInfo = selectedBrandedFare?.baggageInformation;
+                                        return bagInfo && bagInfo.length > 0
+                                          ? `${bagInfo[0].weight} ${bagInfo[0].unit}`
+                                          : "No Baggage Info";
+                                      })()}
+                                    </Typography>
+                                  ) : (
+                                    passengerTypes.map((type) => {
+                                      const count = flight?.extra?.[type]?.count;
+                                      if (count > 0) {
+                                        return (
+                                          <Typography
+                                            fontSize="sm"
+                                            key={`${type}-checkin`}
+                                          >
+                                            <br />
+                                            {type.charAt(0).toUpperCase() +
+                                              type.slice(1)}
+                                            : {getCheckinText(type, flight)}
+                                          </Typography>
+                                        );
+                                      }
+                                      return null;
+                                    })
+                                  )}
                                 </Typography>
                                 <Typography level="body-md">
                                   <b>CABIN:</b>
-                                  {passengerTypes.map((type) => {
-                                    const count = flight?.extra?.[type]?.count;
-                                    if (count > 0) {
-                                      return (
-                                        <Typography
-                                          fontSize="sm"
-                                          key={`${type}-cabin`}
-                                        >
-                                          <br />
-                                          {type.charAt(0).toUpperCase() +
-                                            type.slice(1)}
-                                          : {getCabinText(type, flight)}
-                                        </Typography>
-                                      );
-                                    }
-                                    return null;
-                                  })}
+                                  {isHitit ? (
+                                    <Typography fontSize="sm">
+                                      <br />
+                                      Adult: 7 KG
+                                    </Typography>
+                                  ) : (
+                                    passengerTypes.map((type) => {
+                                      const count = flight?.extra?.[type]?.count;
+                                      if (count > 0) {
+                                        return (
+                                          <Typography
+                                            fontSize="sm"
+                                            key={`${type}-cabin`}
+                                          >
+                                            <br />
+                                            {type.charAt(0).toUpperCase() +
+                                              type.slice(1)}
+                                            : {getCabinText(type, flight)}
+                                          </Typography>
+                                        );
+                                      }
+                                      return null;
+                                    })
+                                  )}
                                 </Typography>
                               </Box>
                             </Box>
@@ -2522,7 +2753,7 @@ const BookingV2 = () => {
                         </Box>
                       </CardContent>
                     </Card>
-                    {flight?.return && (
+                    {flight?.return?.length && (
                       <Card variant="outlined" sx={{ mb: 2 }}>
                         <CardContent>
                           <Box
@@ -2559,10 +2790,10 @@ const BookingV2 = () => {
                                   </Typography>
                                   <Typography level="body-xs">
                                     {flight.arCode ===
-                                      flight?.return?.[0].operatingLogo?.ar
+                                      flight?.return?.[0]?.operatingLogo?.ar
                                       ? ""
-                                      : "Operated By " +
-                                      flight?.return?.[0].operatingLogo?.ar}
+                                      : (flight?.return?.[0]?.operatingLogo?.ar ? "Operated By " +
+                                        flight?.return?.[0]?.operatingLogo?.ar : "")}
                                   </Typography>
                                   {/* <Typography level="body-xs">SV 8732</Typography> */}
 
@@ -2584,7 +2815,7 @@ const BookingV2 = () => {
                                 sx={{ textAlign: "start" }}
                               >
                                 {selectedBrandedFare?.data?.[0]
-                                  ?.brandName?.[0] || "N/A"}
+                                  ?.brandName?.[0] || selectedBrandedFare?.brandName || "N/A"}
                               </Typography>
                               <Divider
                                 orientation="vertical"
@@ -2816,45 +3047,65 @@ const BookingV2 = () => {
                                   </Typography>
                                   <Typography level="body-md">
                                     <b>CHECK IN:</b>
-                                    {passengerTypes.map((type) => {
-                                      const count =
-                                        flight?.extra?.[type]?.count;
-                                      if (count > 0) {
-                                        return (
-                                          <Typography
-                                            fontSize="sm"
-                                            key={`${type}-checkin`}
-                                          >
-                                            <br />
-                                            {type.charAt(0).toUpperCase() +
-                                              type.slice(1)}
-                                            : {getCheckinText(type, flight)}
-                                          </Typography>
-                                        );
-                                      }
-                                      return null;
-                                    })}
+                                    {isHitit ? (
+                                      <Typography fontSize="sm">
+                                        <br />
+                                        Adult:{" "}
+                                        {(() => {
+                                          const bagInfo = selectedBrandedFare?.baggageInformation;
+                                          return bagInfo && bagInfo.length > 0
+                                            ? `${bagInfo[0].weight} ${bagInfo[0].unit}`
+                                            : "No Baggage Info";
+                                        })()}
+                                      </Typography>
+                                    ) : (
+                                      passengerTypes.map((type) => {
+                                        const count =
+                                          flight?.extra?.[type]?.count;
+                                        if (count > 0) {
+                                          return (
+                                            <Typography
+                                              fontSize="sm"
+                                              key={`${type}-checkin`}
+                                            >
+                                              <br />
+                                              {type.charAt(0).toUpperCase() +
+                                                type.slice(1)}
+                                              : {getCheckinText(type, flight)}
+                                            </Typography>
+                                          );
+                                        }
+                                        return null;
+                                      })
+                                    )}
                                   </Typography>
                                   <Typography level="body-md">
                                     <b>CABIN:</b>
-                                    {passengerTypes.map((type) => {
-                                      const count =
-                                        flight?.extra?.[type]?.count;
-                                      if (count > 0) {
-                                        return (
-                                          <Typography
-                                            fontSize="sm"
-                                            key={`${type}-cabin`}
-                                          >
-                                            <br />
-                                            {type.charAt(0).toUpperCase() +
-                                              type.slice(1)}
-                                            : {getCabinText(type, flight)}
-                                          </Typography>
-                                        );
-                                      }
-                                      return null;
-                                    })}
+                                    {isHitit ? (
+                                      <Typography fontSize="sm">
+                                        <br />
+                                        Adult: 7 KG
+                                      </Typography>
+                                    ) : (
+                                      passengerTypes.map((type) => {
+                                        const count =
+                                          flight?.extra?.[type]?.count;
+                                        if (count > 0) {
+                                          return (
+                                            <Typography
+                                              fontSize="sm"
+                                              key={`${type}-cabin`}
+                                            >
+                                              <br />
+                                              {type.charAt(0).toUpperCase() +
+                                                type.slice(1)}
+                                              : {getCabinText(type, flight)}
+                                            </Typography>
+                                          );
+                                        }
+                                        return null;
+                                      })
+                                    )}
                                   </Typography>
                                 </Box>
                               </Box>
@@ -2887,6 +3138,8 @@ const BookingV2 = () => {
                                 <img
                                   // src={"https://res.cloudinary.com/wego/f_auto,fl_lossy,w_1000,q_auto/v1480072078/flights/airlines_square/FZ"}
                                   src={
+                                    flightItem?.connectingFlights?.[0]?.logo
+                                      ?.logo ||
                                     flightItem?.connectingFlights?.[0]
                                       ?.departure?.logo?.logo
                                   }
@@ -2897,13 +3150,19 @@ const BookingV2 = () => {
                               <Box>
                                 <Typography level="body-xs">
                                   {
+                                    flightItem?.connectingFlights?.[0]?.logo
+                                      ?.arCode ||
+                                    flightItem?.connectingFlights?.[0]?.logo
+                                      ?.code ||
                                     flightItem?.connectingFlights?.[0]
                                       ?.departure?.logo?.code
                                   }
                                 </Typography>
                                 <Typography level="body-xs">
-                                  {flightItem?.connectingFlights?.[0]?.departure
+                                  {flightItem?.connectingFlights?.[0]
                                     ?.marketingCarrier ||
+                                    flightItem?.connectingFlights?.[0]?.departure
+                                      ?.marketingCarrier ||
                                     flightItem?.connectingFlights?.[0]
                                       ?.departure?.operatingCarrier ||
                                     flightItem?.connectingFlights?.[0]
@@ -2916,7 +3175,7 @@ const BookingV2 = () => {
                                       ?.marketingFlightNumber}
                                 </Typography>
                                 <Typography level="body-xs">
-                                  {(flightItem?.connectingFlights?.[0]?.logo?.code === flightItem?.connectingFlights?.[0]?.operatingLogo?.code || flightItem?.connectingFlights?.[0]?.departure?.logo?.code === flightItem?.connectingFlights?.[0]?.departure?.operatingLogo?.code) ? "" : "Operated By " + flightItem?.connectingFlights?.[0]?.operatingLogo?.arAbbreviation ? flightItem?.connectingFlights?.[0]?.operatingLogo?.arAbbreviation : flightItem?.connectingFlights?.[0]?.departure?.operatingLogo?.arAbbreviation}
+                                  {(flightItem?.connectingFlights?.[0]?.logo?.code === flightItem?.connectingFlights?.[0]?.operatingLogo?.code || flightItem?.connectingFlights?.[0]?.departure?.logo?.code === flightItem?.connectingFlights?.[0]?.departure?.operatingLogo?.code) ? "" : (flightItem?.connectingFlights?.[0]?.operatingLogo?.arAbbreviation || flightItem?.connectingFlights?.[0]?.departure?.operatingLogo?.arAbbreviation) ? "Operated By " + (flightItem?.connectingFlights?.[0]?.operatingLogo?.arAbbreviation || flightItem?.connectingFlights?.[0]?.departure?.operatingLogo?.arAbbreviation) : ""}
                                 </Typography>
                                 {/* <Typography level="body-xs">SV 8732</Typography> */}
 
@@ -3425,7 +3684,7 @@ const BookingV2 = () => {
               <LinearProgress
                 determinate
                 value={
-                  ((timeLeft.minutes * 60 + timeLeft.seconds) / (20 * 60)) * 100
+                  ((timeLeft.minutes * 60 + timeLeft.seconds) / ((isHitit ? 10 : 20) * 60)) * 100
                 }
                 size="lg"
                 thickness={16}
@@ -3527,7 +3786,8 @@ const BookingV2 = () => {
             >
               Cancel
             </Button>
-            <Button onClick={addTenMinutes}>More Time</Button>
+            {/* Only show 'More Time' for non-Hitit GDS */}
+            {!isHitit && <Button onClick={addTenMinutes}>More Time</Button>}
           </Box>
         </Box>
       </Modal>
@@ -3544,10 +3804,12 @@ const BookingV2 = () => {
             <TimerIcon sx={{ height: "75px", width: "75px" }} />
           </Box>
           <Typography id="modal-modal-title" variant="h6" component="h2">
-            Session time out!
+            {isHitit ? "Fare selection expired!" : "Session time out!"}
           </Typography>
           <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-            Your session expired
+            {isHitit
+              ? "Your fare selection has expired. Please search again to get updated prices."
+              : "Your session expired"}
           </Typography>
 
           <Button
@@ -3557,7 +3819,7 @@ const BookingV2 = () => {
               setExpiredTimerModal(false);
             }}
           >
-            New Search
+            Search Again
           </Button>
         </Box>
       </Modal>

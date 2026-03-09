@@ -89,7 +89,7 @@ const ProfileMainInfo = () => {
                 {agencyData?.agencyName?.substring(0, 2).toUpperCase() || "AT"}
               </Avatar>
               <Typography level="body-xs" sx={{ color: "#666", textAlign: "center", fontSize: 12 }}>
-                {agencyData?.agencyName || agencyData?.affiliateName || "INNOVATION TECH TRAVEL"}
+                {agencyData?.agencyName || agencyData?.affiliateName || "AL SABOOR TRAVEL"}
               </Typography>
             </Box>
 
@@ -201,7 +201,7 @@ const ProfileMainInfo = () => {
           {/* Right side - Company Contact Info */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1.2, minWidth: "220px" }}>
             <Typography level="body-xs" sx={{ fontWeight: 600, mb: 0.5, fontSize: 14 }}>
-              {agencyData?.agencyName || agencyData?.affiliateName || "INNOVATION TECH TRAVEL"}
+              {agencyData?.agencyName || agencyData?.affiliateName || "AL SABOOR TRAVEL"}
             </Typography>
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>

@@ -137,7 +137,7 @@ const SubUser = () => {
                 variant: "success",
             });
             dispatch(setLoading(false));
-            fetchBalanceOfStaff()
+            fetchAgencies()
         }).catch((err) => {
             console.log(err)
             enqueueSnackbar(err || "Cannot delete staff!", {
@@ -354,16 +354,12 @@ const SubUser = () => {
             userCnic,
             userEmail,
             userName,
-            role: stateRole,
+            role,
             password,
-            selectedAgency: stateSelectedAgency,
+            selectedAgency,
             phone,
             assignedSPO
         } = userManagement;
-
-        const role = stateRole || (usersRoles[0]?.name ? (usersRoles[0].name === "SPO" ? "SPO" : usersRoles[0].name.toLowerCase()) : "");
-        const selectedAgency = stateSelectedAgency || (allAgencies[0]?._id ? allAgencies[0]._id : "");
-
         console.log(
             "we are checking all ",
             userCnic,
@@ -372,6 +368,14 @@ const SubUser = () => {
             role,
             password
         );
+        // Validate email
+        // if (
+        //   !userEmail ||
+        //   !/^[\w-\.]+@(gmail\.com|[\w-]+\.asaam\.pk)$/.test(userEmail)
+        // ) {
+        //   enqueueSnackbar("Please enter a valid email address.");
+        //   return;
+        // }
 
         // Validate CNIC
         if (!userCnic || !/^\d{13}$/.test(userCnic)) {
@@ -379,7 +383,7 @@ const SubUser = () => {
             return;
         }
 
-        // Validate Password
+        // Validate CNIC
         if (!password || !passwordRegex.test(password)) {
             enqueueSnackbar("Please enter a valid password.");
             return;
@@ -390,7 +394,7 @@ const SubUser = () => {
             enqueueSnackbar("Please enter staff role");
             return;
         }
-        if (!selectedAgency && !userData?.agency_id) {
+        if (!selectedAgency) {
             enqueueSnackbar("Please select agency");
             return;
         }
@@ -412,14 +416,10 @@ const SubUser = () => {
             email: userEmail,
             CNIC: userCnic,
             password,
-            role: role === "SPO" ? role : role?.toLowerCase(),
+            role,
             agencyId: selectedAgency || userData?.agency_id,
             phone: phone.replace(/\s+/g, ""),
-            assignedSPO,
-            agencyName: userManagement.agencyName,
-            officeAddress: userManagement.officeAddress,
-            city: userManagement.city,
-            consultant: userManagement.consultant
+            assignedSPO
         };
 
         try {
@@ -457,16 +457,10 @@ const SubUser = () => {
         dispatch(setLoading(true))
 
         const body = {
-            firstName: editStaff.userName || editStaff.firstName,
+            firstName: editStaff.userName,
             email: editStaff?.email,
             role: editStaff?.role === "SPO" ? editStaff?.role : editStaff?.role?.toLowerCase(),
-            CNIC: editStaff?.userCnic || editStaff?.CNIC,
-            phone: editStaff?.phone,
-            agencyName: editStaff?.agencyName,
-            officeAddress: editStaff?.officeAddress,
-            city: editStaff?.city,
-            consultant: editStaff?.consultant,
-            agencyId: editStaff?.selectedAgency || editStaff?.agencyId
+            CNIC: editStaff?.CNIC,
         };
         try {
             const res = await updateAgencyStaff(editStaff._id, body);

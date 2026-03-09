@@ -83,7 +83,7 @@ const Contactus = () => {
                 level="body-xs"
                 sx={{ color: "white", width: "172px", textAlign: "center" }}
               >
-                Scan the QR Code to download the INNOVATION TECH Travels Mobile App
+                Scan the QR Code to download the Al-Saboor Travels Mobile App
               </Typography>
             </div>
           </div>

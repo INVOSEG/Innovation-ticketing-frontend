@@ -903,7 +903,7 @@ const SearchTicket = () => {
                     <Typography sx={{ fontSize: "34px", fontWeight: "500", fontFamily: "Poppins" }} >Search Flights</Typography>
                     <Box sx={{ pr: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
                       <NotificationsActiveIcon style={{ width: "30px", height: "80px" }} />
-                      <Typography sx={{ fontSize: "24px", fontWeight: "500", fontFamily: "Poppins", color: "#9d4a49" }} >How to use INNOVATION TECH Portal</Typography>
+                      <Typography sx={{ fontSize: "24px", fontWeight: "500", fontFamily: "Poppins", color: "#9d4a49" }} >How to use Al-Saboor Portal</Typography>
                       <FlightTakeoffIcon style={{ width: "40px", height: "90px" }} />
                     </Box>
 

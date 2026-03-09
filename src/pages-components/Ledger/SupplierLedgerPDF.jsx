@@ -54,7 +54,7 @@ const SupplierLedgerPDF = ({ ledgerData, startDate, endDate, totalCredited, tota
          <Page size="A3" >
 
             <View style={{ width: "100%", height: "175px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px" }}>
-               <Text style={{ fontWeight: "800", fontSize: "20px" }}> INNOVATION TECH TRAVEL AND TOURISM</Text>
+               <Text style={{ fontWeight: "800", fontSize: "20px" }}> Al-Saboor TRAVEL AND TOURISM</Text>
                <Text style={{ fontWeight: "800", fontSize: "16px" }}> OPP, HAZVARD GRAMMER SCHOOL, KUTCHERY ROAD, SIALKOT, PAKISTAN</Text>
                <Text style={{ fontWeight: "800", fontSize: "12px" }}> 052-4268155-56-57</Text>
                <Text style={{ fontWeight: "800", fontSize: "12px" }}> NTN: 3246536-0</Text>

@@ -151,7 +151,7 @@ export default function UserManagement() {
         variant: "success",
       });
       dispatch(setLoading(false));
-      fetchAgencies()
+      fetchAgencyUsers()
     }).catch((err) => {
       console.log(err)
       enqueueSnackbar(err || "Cannot delete staff!", {
@@ -340,12 +340,15 @@ export default function UserManagement() {
       userCnic,
       userEmail,
       userName,
-      role,
+      role: stateRole,
       password,
-      selectedAgency,
+      selectedAgency: stateSelectedAgency,
       phone,
       assignedSPO
     } = userManagement;
+
+    const role = stateRole || (usersRoles[0]?.name ? (usersRoles[0].name === "SPO" ? "SPO" : usersRoles[0].name.toLowerCase()) : "");
+    const selectedAgency = stateSelectedAgency || (allAgencies[0]?._id ? allAgencies[0]._id : "");
     console.log(
       "we are checking all ",
       userCnic,
@@ -376,15 +379,10 @@ export default function UserManagement() {
       return;
     }
 
-    // Check for role
-    // if (!role) {
-    //   enqueueSnackbar("Please enter staff role");
-    //   return;
-    // }
-    // if (!selectedAgency) {
-    //   enqueueSnackbar("Please select agency");
-    //   return;
-    // }
+    if (!selectedAgency && !userData?.agency_id) {
+      enqueueSnackbar("Please select agency");
+      return;
+    }
 
     // Validate user name length
     if (!userName) {
@@ -403,8 +401,8 @@ export default function UserManagement() {
       email: userEmail,
       CNIC: userCnic,
       password,
-      role: role || usersRoles[0]?.name?.toLowerCase(),
-      agencyId: selectedAgency || allAgencies[0]?._id,
+      role: role === "SPO" ? role : role?.toLowerCase(),
+      agencyId: selectedAgency || userData?.agency_id,
       phone: phone?.replace(/\s+/g, ""),
       assignedSPO,
       agencyName: userManagement.agencyName,
@@ -489,7 +487,7 @@ export default function UserManagement() {
     dispatch(setLoading(true))
 
     const body = {
-      firstName: editStaff.userName,
+      firstName: editStaff.userName || editStaff.firstName,
       email: editStaff?.email,
       role: editStaff?.role === "SPO" ? editStaff?.role : editStaff?.role?.toLowerCase(),
       CNIC: editStaff?.userCnic || editStaff?.CNIC,

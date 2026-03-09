@@ -538,7 +538,7 @@ export default function UserManagement() {
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        height: "700px",
+        minHeight: "700px",
       }}
     >
       <Box>
@@ -581,7 +581,7 @@ export default function UserManagement() {
           className="OrderTableContainer"
           variant="outlined"
           sx={{
-            display: { xs: "none", sm: "initial" },
+            display: "block",
             width: "100%",
             borderRadius: "sm",
             flexShrink: 1,
@@ -594,6 +594,7 @@ export default function UserManagement() {
             // stickyHeader
             hoverRow
             sx={{
+              minWidth: 800,
               "--TableCell-headBackground":
                 "var(--joy-palette-background-level1)",
               "--Table-headerUnderlineThickness": "1px",
@@ -641,7 +642,7 @@ export default function UserManagement() {
             </thead>
             {agencies.length > 0 && (
               <tbody>
-                {stableSort(agencies, getComparator(order, "userName"))?.map(
+                {agencies?.map(
                   (row) => (
                     <tr key={row?.agencyName}>
                       {/* <td>
@@ -689,7 +690,7 @@ export default function UserManagement() {
           className="Pagination-laptopUp"
           sx={{
             pt: 2,
-            display: { xs: "none", md: "flex" },
+            display: "flex",
             justifyContent: "center",
           }}
         >

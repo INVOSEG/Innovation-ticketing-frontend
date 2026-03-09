@@ -166,6 +166,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
   },
+  deadlineText: {
+    fontSize: 10,
+    color: "#dc2626",
+    fontWeight: "bold",
+    marginTop: 4,
+  },
 });
 
 const formatDate = (d) =>
@@ -185,11 +191,24 @@ const formatTime = (d) =>
     })
     : "—";
 
+// Converts ISO 8601 duration (e.g. "PT1H55M", "PT2H", "PT30M") to "1h 55m"
+const formatISODuration = (duration) => {
+  if (!duration || typeof duration !== "string") return null;
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+  if (!match) return duration; // Return as-is if unrecognised format
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  if (minutes) return `${minutes}m`;
+  return null;
+};
+
 // Function to move postfix titles to the front
 const movePostfixToFront = (fullName) => {
   if (!fullName || typeof fullName !== "string") return fullName;
 
-  const titles = ["Mr", "Mrs", "Miss", "Ms", "Dr", "Prof"];
+  const titles = ["Mr", "Mrs", "Miss", "Ms", "Dr", "Mstr", "Prof"];
 
   const parts = fullName.trim().split(/\s+/);
 
@@ -218,6 +237,34 @@ const movePostfixToFront = (fullName) => {
 
   // If no title found in the name, return as is
   return fullName;
+};
+
+// Function to get baggage info
+const getBaggageInfo = (flight, bookingData) => {
+  const isHitit = bookingData?.api?.toLowerCase() === "hitit";
+  let checkInVal = "";
+  let cabinVal = "";
+
+  if (isHitit) {
+    const bagInfo =
+      bookingData?.selectedBrandedFare?.baggageInformation?.[0] ||
+      bookingData?.brandedFare?.baggageInformation?.[0] ||
+      flight?.baggageInformation?.[0];
+    checkInVal = bagInfo ? `${bagInfo.weight} ${bagInfo.unit}` : "20 KG";
+    cabinVal = "7 KG";
+  } else {
+    if (flight?.checkedBaggage) checkInVal = flight.checkedBaggage;
+    else if (flight?.baggage) checkInVal = flight.baggage;
+    else if (flight?.pieceCount) checkInVal = `${flight.pieceCount} PC`;
+
+    cabinVal = flight?.cabinBaggage || "7 KG";
+  }
+
+  const parts = [];
+  if (checkInVal && checkInVal !== "N/A") parts.push(`Check-in: ${checkInVal}`);
+  if (cabinVal && cabinVal !== "N/A") parts.push(`Cabin: ${cabinVal}`);
+
+  return parts.length > 0 ? parts.join(", ") : "Not Available";
 };
 
 const TicketPDF = ({
@@ -271,7 +318,10 @@ const TicketPDF = ({
 
   // Extract flight information for one-way/round-trip
   const oneWayFlight = departureFlights[0] || {};
+  const lastDepartureFlight =
+    departureFlights[departureFlights.length - 1] || {};
   const roundFlight = returnFlights[0] || {};
+  const lastReturnFlight = returnFlights[returnFlights.length - 1] || {};
 
   const oneWaydepAtRaw =
     oneWayFlight?.DepartureDateTime || oneWayFlight?.departureTime;
@@ -301,16 +351,16 @@ const TicketPDF = ({
     oneWayFlight?.from ||
     "—";
   const oneWayToCode =
-    oneWayFlight?.DestinationLocation?.LocationCode ||
-    oneWayFlight?.arrivalLocation ||
-    oneWayFlight?.to ||
+    lastDepartureFlight?.DestinationLocation?.LocationCode ||
+    lastDepartureFlight?.arrivalLocation ||
+    lastDepartureFlight?.to ||
     "—";
   const oneWayFromCity = oneWayFlight?.fromAirport?.city;
-  const oneWayToCity = oneWayFlight?.toAirport?.city;
+  const oneWayToCity = lastDepartureFlight?.toAirport?.city;
   const oneWayFromCountry = oneWayFlight?.fromAirport?.country;
-  const oneWayToCountry = oneWayFlight?.toAirport?.country;
+  const oneWayToCountry = lastDepartureFlight?.toAirport?.country;
   const oneWayFromName = oneWayFlight?.fromAirport?.name;
-  const oneWayToName = oneWayFlight?.toAirport?.name;
+  const oneWayToName = lastDepartureFlight?.toAirport?.name;
 
   const rounddepAtRaw =
     roundFlight?.DepartureDateTime || roundFlight?.departureTime;
@@ -337,9 +387,9 @@ const TicketPDF = ({
     roundFlight?.from ||
     "—";
   const roundToCode =
-    roundFlight?.DestinationLocation?.LocationCode ||
-    roundFlight?.arrivalLocation ||
-    roundFlight?.to ||
+    lastReturnFlight?.DestinationLocation?.LocationCode ||
+    lastReturnFlight?.arrivalLocation ||
+    lastReturnFlight?.to ||
     "—";
   const roundFromCity = roundFromCode;
   const roundToCity = roundToCode;
@@ -347,9 +397,14 @@ const TicketPDF = ({
   const onewayticketDate = formatDate(oneWaydepAtRaw || bookingData?.createdAt);
   const roundticketDate = formatDate(rounddepAtRaw);
 
-  const status = bookingData?.status || "Confirmed";
+  const status = bookingData?.status || "hold";
+  const createdAt = bookingData?.createdAt || ticketData?.createdAt;
 
-  console.log("TicketPDF - flightType:", flightType);
+  // Calculate payment deadline (20 minutes from createdAt if not provided by backend)
+  const paymentDeadlineRaw = bookingData?.paymentDeadline;
+
+  console.log("TicketPDF - Final status:", status);
+  console.log("TicketPDF - Final paymentDeadlineRaw:", paymentDeadlineRaw);
   console.log("TicketPDF - departureFlights:", departureFlights);
   console.log("TicketPDF - returnFlights:", returnFlights);
   console.log("TicketPDF - multiCityFlights:", multiCityFlights);
@@ -384,6 +439,12 @@ const TicketPDF = ({
                   ? `${oneWayFromCode} - ${oneWayToCode} - ${roundToCode}`
                   : `${oneWayFromCode} - ${oneWayToCode}`}
             </Text>
+            {paymentDeadlineRaw && status?.toLowerCase() !== "confirmed" && (
+              <Text style={styles.deadlineText}>
+                Booking Deadline: {formatDate(paymentDeadlineRaw)} {formatTime(paymentDeadlineRaw)}
+                {"\n"}(Booking will be automatically cancelled if not paid by this time)
+              </Text>
+            )}
           </View>
           <View style={styles.headerRight}>
             <Text style={styles.preparedLabel}>PREPARED FOR</Text>
@@ -429,7 +490,7 @@ const TicketPDF = ({
               <View key={i} style={styles.passengerRow}>
                 <Text style={[styles.passengerNameCol]}>
                   {movePostfixToFront(
-                    `${travelers[0]?.name?.firstName || ""} ${travelers[0]?.name?.lastName || ""
+                    `${trav?.name?.firstName || ""} ${trav?.name?.lastName || ""
                       }`.trim()
                   )}
                 </Text>
@@ -488,24 +549,33 @@ const TicketPDF = ({
                         <Text style={styles.flightNumber}>
                           {flight?.MarketingAirline?.Code ||
                             flight?.marketing ||
+                            flight?.marketingCarrier ||
                             ""}{" "}
-                          {flight?.FlightNumber || flight?.flightNumber || ""}
+                          {flight?.FlightNumber || flight?.flightNumber || flight?.marketingFlightNumber || ""}
                         </Text>
                       </View>
                     </View>
                     <View>
+                      {flight?.marketedBy && (
+                        <Text style={styles.airlineInfo}>
+                          {flight?.marketedBy || "N/A"}
+                        </Text>
+                      )}
+
+                      {flight?.operatedBy && (
+                        <Text style={styles.airlineInfo}>
+                          {flight?.operatedBy || "N/A"}
+                        </Text>
+                      )}
+
                       <Text style={styles.airlineInfo}>
-                        {flight?.marketedBy || "N/A"}
+                        Class: {flight?.class || flight?.cabin?.name || "Economy"}
                       </Text>
-                      <Text style={styles.airlineInfo}>
-                        {flight?.operatedBy || "N/A"}
-                      </Text>
-                      <Text style={styles.airlineInfo}>
-                        Class:{" "}
+                      <Text style={styles.statusLabel}>
+                        Status:{" "}
                         {bookingData?.status === "confirmed"
                           ? "CONFIRMED"
                           : bookingData?.status?.toUpperCase() || "CONFIRMED"}
-                        {flight?.class || "Economy"}
                       </Text>
                     </View>
                   </View>
@@ -591,22 +661,40 @@ const TicketPDF = ({
                     <View>
                       <Text style={styles.detailLabel}>Meals:</Text>
                       <Text style={styles.detailValue}>
-                        {flight?.MarketingAirline.Code === "EK"
+                        {flight?.MarketingAirline?.Code === "EK"
                           ? "Available"
-                          : flight?.meals === "true"
-                            ? "Available"
-                            : "Not Available"}
+                          : bookingData?.api?.toLowerCase() === "hitit"
+                            ? (flight?.meal || "No Meal")
+                            : flight?.meals === "true"
+                              ? "Available"
+                              : "Not Available"}
                       </Text>{" "}
                     </View>
-                    {/* <View><Text style={styles.detailLabel}>Stops:</Text>
-                  <Text style={styles.detailValue}>{flight?.stops || "0"}</Text>
-                  </View> */}
                     <View>
-                      <Text style={styles.detailLabel}>Distance(miles):</Text>
+                      <Text style={styles.detailLabel}>Baggage:</Text>
                       <Text style={styles.detailValue}>
-                        {flight?.distance || "N/A"}
+                        {getBaggageInfo(flight, bookingData)}
                       </Text>
                     </View>
+                    {/* Distance / Duration */}
+                    {(() => {
+                      const isHitit = bookingData?.api?.toLowerCase() === "hitit";
+                      const formattedDuration = isHitit ? formatISODuration(flight?.duration) : null;
+                      const showRow = isHitit ? (formattedDuration || flight?.distance) : true;
+                      if (!showRow) return null;
+                      return (
+                        <View>
+                          <Text style={styles.detailLabel}>
+                            {isHitit ? "Duration:" : "Distance(miles):"}
+                          </Text>
+                          <Text style={styles.detailValue}>
+                            {isHitit
+                              ? (formattedDuration || flight?.distance || "N/A")
+                              : (flight?.distance || "N/A")}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
               </View>
@@ -645,24 +733,33 @@ const TicketPDF = ({
                           <Text style={styles.flightNumber}>
                             {flight?.MarketingAirline?.Code ||
                               flight?.marketing ||
+                              flight?.marketingCarrier ||
                               ""}{" "}
-                            {flight?.FlightNumber || flight?.flightNumber || ""}
+                            {flight?.FlightNumber || flight?.flightNumber || flight?.marketingFlightNumber || ""}
                           </Text>
                         </View>
                       </View>
                       <View>
+                        {flight?.marketedBy && (
+                          <Text style={styles.airlineInfo}>
+                            {flight?.marketedBy || "N/A"}
+                          </Text>
+                        )}
+
+                        {flight?.operatedBy && (
+                          <Text style={styles.airlineInfo}>
+                            {flight?.operatedBy || "N/A"}
+                          </Text>
+                        )}
+
                         <Text style={styles.airlineInfo}>
-                          {flight?.marketedBy || "N/A"}
+                          Class: {flight?.class || flight?.cabin?.name || "Economy"}
                         </Text>
-                        <Text style={styles.airlineInfo}>
-                          {flight?.operatedBy || "N/A"}
-                        </Text>
-                        <Text style={styles.airlineInfo}>
-                          Class:{" "}
+                        <Text style={styles.statusLabel}>
+                          Status:{" "}
                           {bookingData?.status === "confirmed"
                             ? "CONFIRMED"
                             : bookingData?.status?.toUpperCase() || "CONFIRMED"}
-                          {flight?.class || "Economy"}
                         </Text>
                       </View>
                     </View>
@@ -748,22 +845,40 @@ const TicketPDF = ({
                       <View>
                         <Text style={styles.detailLabel}>Meals:</Text>
                         <Text style={styles.detailValue}>
-                          {flight?.MarketingAirline.Code === "EK"
+                          {flight?.MarketingAirline?.Code === "EK"
                             ? "Available"
-                            : flight?.meals === "true"
-                              ? "Available"
-                              : "Not Available"}
+                            : bookingData?.api?.toLowerCase() === "hitit"
+                              ? (flight?.meal || "No Meal")
+                              : flight?.meals === "true"
+                                ? "Available"
+                                : "Not Available"}
                         </Text>{" "}
                       </View>
-                      {/* <View><Text style={styles.detailLabel}>Stops:</Text>
-                  <Text style={styles.detailValue}>{flight?.stops || "0"}</Text>
-                  </View> */}
                       <View>
-                        <Text style={styles.detailLabel}>Distance(miles):</Text>
+                        <Text style={styles.detailLabel}>Baggage:</Text>
                         <Text style={styles.detailValue}>
-                          {flight?.distance || "N/A"}
+                          {getBaggageInfo(flight, bookingData)}
                         </Text>
                       </View>
+                      {/* Distance / Duration */}
+                      {(() => {
+                        const isHitit = bookingData?.api?.toLowerCase() === "hitit";
+                        const formattedDuration = isHitit ? formatISODuration(flight?.duration) : null;
+                        const showRow = isHitit ? (formattedDuration || flight?.distance) : true;
+                        if (!showRow) return null;
+                        return (
+                          <View>
+                            <Text style={styles.detailLabel}>
+                              {isHitit ? "Duration:" : "Distance(miles):"}
+                            </Text>
+                            <Text style={styles.detailValue}>
+                              {isHitit
+                                ? (formattedDuration || flight?.distance || "N/A")
+                                : (flight?.distance || "N/A")}
+                            </Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   </View>
                 </View>
@@ -799,20 +914,27 @@ const TicketPDF = ({
                           <Text style={styles.flightNumber}>
                             {flight?.MarketingAirline?.Code ||
                               flight?.marketing ||
+                              flight?.marketingCarrier ||
                               ""}{" "}
-                            {flight?.FlightNumber || flight?.flightNumber || ""}
+                            {flight?.FlightNumber || flight?.flightNumber || flight?.marketingFlightNumber || ""}
                           </Text>
                         </View>
                       </View>
                       <View>
+                        {flight?.marketedBy && (
+                          <Text style={styles.airlineInfo}>
+                            {flight?.marketedBy || "N/A"}
+                          </Text>
+                        )}
+
+                        {flight?.operatedBy && (
+                          <Text style={styles.airlineInfo}>
+                            {flight?.operatedBy || "N/A"}
+                          </Text>
+                        )}
+
                         <Text style={styles.airlineInfo}>
-                          {flight?.marketedBy || "N/A"}
-                        </Text>
-                        <Text style={styles.airlineInfo}>
-                          {flight?.operatedBy || "N/A"}
-                        </Text>
-                        <Text style={styles.airlineInfo}>
-                          Class: {flight?.class || "Economy"}
+                          Class: {flight?.class || flight?.cabin?.name || "Economy"}
                         </Text>
                         <Text style={styles.statusLabel}>
                           Status:{" "}
@@ -871,11 +993,22 @@ const TicketPDF = ({
                               flight?.DepartureDateTime || flight?.departureTime
                             )}
                           </Text>
+                          <Text style={styles.timeLabel}>
+                            {formatDate(
+                              flight?.DepartureDateTime || flight?.departureTime
+                            )}
+                          </Text>
+
                         </View>
                         <View style={styles.timeCol1}>
                           <Text style={styles.timeLabel}>Arriving At</Text>
                           <Text style={styles.timeLabel}>
                             {formatTime(
+                              flight?.ArrivalDateTime || flight?.arrivalTime
+                            )}
+                          </Text>
+                          <Text style={styles.timeLabel}>
+                            {formatDate(
                               flight?.ArrivalDateTime || flight?.arrivalTime
                             )}
                           </Text>
@@ -887,25 +1020,45 @@ const TicketPDF = ({
                     <View style={styles.rightPanel}>
                       <View>
                         <Text style={styles.detailLabel}>Aircraft:</Text>
-                        <Text style={styles.detailValue}>N/A</Text>
+                        <Text style={styles.detailValue}>{flight?.aircraft || "N/A"}</Text>
                       </View>
                       <View>
                         <Text style={styles.detailLabel}>Meals:</Text>
                         <Text style={styles.detailValue}>
-                          {flight?.MarketingAirline.Code === "EK"
+                          {flight?.MarketingAirline?.Code === "EK"
                             ? "Available"
-                            : departureFlights?.[0]?.meals === "true"
-                              ? "Available"
-                              : "Not Available"}
+                            : bookingData?.api?.toLowerCase() === "hitit"
+                              ? (flight?.meal || "No Meal")
+                              : departureFlights?.[0]?.meals === "true"
+                                ? "Available"
+                                : "Not Available"}
                         </Text>
                       </View>
-                      {/* <View><Text style={styles.detailLabel}>Stops:</Text>
-                      <Text style={styles.detailValue}>{flight?.stops || "0"}</Text>
-                      </View> */}
                       <View>
-                        <Text style={styles.detailLabel}>Distance(miles):</Text>
-                        <Text style={styles.detailValue}>N/A</Text>
+                        <Text style={styles.detailLabel}>Baggage:</Text>
+                        <Text style={styles.detailValue}>
+                          {getBaggageInfo(flight, bookingData)}
+                        </Text>
                       </View>
+                      {/* Distance / Duration */}
+                      {(() => {
+                        const isHitit = bookingData?.api?.toLowerCase() === "hitit";
+                        const formattedDuration = isHitit ? formatISODuration(flight?.duration) : null;
+                        const showRow = isHitit ? (formattedDuration || flight?.distance) : true;
+                        if (!showRow) return null;
+                        return (
+                          <View>
+                            <Text style={styles.detailLabel}>
+                              {isHitit ? "Duration:" : "Distance(miles):"}
+                            </Text>
+                            <Text style={styles.detailValue}>
+                              {isHitit
+                                ? (formattedDuration || flight?.distance || "N/A")
+                                : (flight?.distance || "N/A")}
+                            </Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   </View>
                 </View>
@@ -948,12 +1101,17 @@ const TicketPDF = ({
                       </View>
                     </View>
                     <View>
-                      <Text style={styles.airlineInfo}>
-                        {flight?.marketedBy || "N/A"}
-                      </Text>
-                      <Text style={styles.airlineInfo}>
-                        {flight?.operatedBy || "N/A"}
-                      </Text>
+                      {flight?.marketedBy && (
+                        <Text style={styles.airlineInfo}>
+                          {flight?.marketedBy || "N/A"}
+                        </Text>
+                      )}
+
+                      {flight?.operatedBy && (
+                        <Text style={styles.airlineInfo}>
+                          {flight?.operatedBy || "N/A"}
+                        </Text>
+                      )}
                       <Text style={styles.airlineInfo}>
                         Class: {flight?.class || "Economy"}
                       </Text>
@@ -1034,7 +1192,13 @@ const TicketPDF = ({
                           ? "Available"
                           : flight?.meals === "true"
                             ? "Available"
-                            : "Not Available"}
+                            : bookingData?.api?.toLowerCase() === "hitit" ? "No Information Available" : "Not Available"}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.detailLabel}>Baggage:</Text>
+                      <Text style={styles.detailValue}>
+                        {getBaggageInfo(flight, bookingData)}
                       </Text>
                     </View>
                     {/* <View><Text style={styles.detailLabel}>Stops:</Text>

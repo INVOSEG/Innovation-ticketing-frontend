@@ -407,6 +407,9 @@ export const updateStatus = (id, url, status, ticket) => {
 };
 
 export const viewItinary = (id, url) => {
+  if (url === 'hitit' || url?.toLowerCase() === 'hitit') {
+    return makeRequest("get", `hitit/order/${id}`);
+  }
   return makeRequest("post", `${url}/viewItinary`, { pnr: id });
 };
 
@@ -554,3 +557,33 @@ export const addlimitOfStaff = (body) => {
 export const updateProfilePassword = (body) => {
   return makeRequest("patch", "auth/updatePassword", body)
 }
+
+
+export const hititSearchFlights = (body) => {
+  return makeRequest("post", "hitit/search-flights", body);
+};
+
+
+export const hititBookFlight = (body) => {
+  return makeRequest("post", "hitit/order", body);
+};
+
+export const hititIssueTicket = (body) => {
+  // Mapping to order/change endpoint as requested
+  return makeRequest("post", "hitit/order/change", body);
+};
+
+export const hititVoidTicket = (body) => {
+  return makeRequest("post", "hitit/ticket/void", body);
+};
+
+
+
+
+export const hititFareRules = (body) => {
+  return makeRequest("post", "hitit/order/fare", body);
+};
+
+export const hititCancelBooking = (body) => {
+  return makeRequest("post", "hitit/order/cancel", body);
+};

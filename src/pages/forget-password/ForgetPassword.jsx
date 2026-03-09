@@ -316,7 +316,7 @@ export default function ForgetPassword() {
                     </Box>
                     <Box component="footer" sx={{ py: 3 }}>
                         <Typography level="body-xs" textAlign="center">
-                            © INNOVATION TECH {new Date().getFullYear()}
+                            © Al-Saboor {new Date().getFullYear()}
                         </Typography>
                     </Box>
                 </Box>

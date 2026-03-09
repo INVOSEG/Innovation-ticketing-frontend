@@ -55,9 +55,9 @@ export const makeRequest = async (type, path, body = null, options = {}) => {
       case 'PUT':
         response = await instance.put(path, body, config);
         break;
-        case 'PATCH':
-          response = await instance.patch(path, body, config);
-          break;
+      case 'PATCH':
+        response = await instance.patch(path, body, config);
+        break;
       case 'DELETE':
         response = await instance.delete(path, config);
         break;
@@ -70,7 +70,7 @@ export const makeRequest = async (type, path, body = null, options = {}) => {
     console.error('Error making request:', error);
     console.error('Error object:', JSON.stringify(error, null, 2));
     // Handle specific errors
-    if (error.response?.status ) {
+    if (error.response?.status) {
       console.log("erororoorororoor")
       // Handle unauthorized error, such as refreshing tokens or redirecting
       // ToastNotification('error', 'Session expired. Please login again');
@@ -103,6 +103,7 @@ instance.interceptors.response.use(
   },
   (error) => {
     // Return the error message so it can be handled by the calling component
-    return Promise.reject(error.response?.data?.error || "Something went wrong");
+    // Hitit uses `message` field; other APIs use `error` field
+    return Promise.reject(error.response?.data?.message || error.response?.data?.error || "Something went wrong");
   }
 )

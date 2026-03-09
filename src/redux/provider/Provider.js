@@ -32,7 +32,7 @@ const customTheme = extendTheme({
 export function StoreProviders({ children }) {
   const snackbarAnchorOrigin = {
     vertical: 'bottom',
-    horizontal: 'left',
+    horizontal: 'right',
   };
 
   return (

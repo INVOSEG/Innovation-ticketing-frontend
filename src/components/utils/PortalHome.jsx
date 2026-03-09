@@ -728,10 +728,10 @@ function PortalHome() {
       setArrivalCity({ value: searchObj?.legs?.[0]?.destination, label: `${arrivalLabel?.name} (${arrivalLabel?.id})` });
       setFromLocation({ code: searchObj?.legs?.[0]?.source, name: departureLabel?.name })
       setToLocation({ code: searchObj?.legs?.[0]?.destination, name: arrivalLabel?.name })
-      setDepartureDate(searchObj?.legs?.[0]?.date)
-      setDepartDate(searchObj?.legs?.[0]?.date)
-      setReturnDateDuplicate(searchObj?.legs?.[0]?.returnDate)
-      setReturnDate(searchObj?.legs?.[0]?.returnDate)
+      setDepartureDate(searchObj?.legs?.[0]?.date ? new Date(searchObj.legs[0].date) : new Date())
+      setDepartDate(searchObj?.legs?.[0]?.date ? new Date(searchObj.legs[0].date) : new Date())
+      setReturnDateDuplicate(searchObj?.legs?.[0]?.returnDate ? new Date(searchObj.legs[0].returnDate) : null)
+      setReturnDate(searchObj?.legs?.[0]?.returnDate ? new Date(searchObj.legs[0].returnDate) : null)
       setInfantsCount(searchObj?.infant);
       setAdultsCount(searchObj?.adult);
       setChildrenCount(searchObj?.child);
@@ -882,15 +882,16 @@ function PortalHome() {
     if (selectedDate === "departureDate") {
       setDepartDate(name)
       setDepartureDate(name)
-      // if (tripType === "One Way") {
-      //   handleSearch(selectedDate, name)
-      // }
+
+      if (tripType === "Round Trip") {
+        const nextWeek = new Date(name);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        setReturnDate(nextWeek);
+        setReturnDateDuplicate(nextWeek);
+      }
     } else if (selectedDate === "returnDate") {
       setReturnDateDuplicate(name)
       setReturnDate(name)
-      // if (tripType === "Round Trip") {
-      //   handleSearch(selectedDate, name)
-      // }
     }
 
 
@@ -1408,7 +1409,7 @@ function PortalHome() {
                             title="Select Return Date"
                             name="returnDate"
                             openDatePicker={true}
-                            minDate={new Date()}
+                            minDate={departDate}
                           />
                         </Box>
                       </Box>
@@ -1947,7 +1948,7 @@ function PortalHome() {
 
                   <Box sx={{ width: { sm: "65%", md: "65%", lg: "55%" }, height: "auto", display: "flex", alignItems: "center", flexDirection: "column", gap: "20px" }}>
                     {/* <Box sx={{ display: "flex", alignItems: "center", gap: "10px", height: "30px", }}>
-                      <Typography sx={{ fontSize: { sm: "12px", md: "14px", lg: "16px" }, fontWeight: "500", fontFamily: "Poppins", color: "#9d4a49" }} >How to use INNOVATION TECH Portal</Typography>
+                      <Typography sx={{ fontSize: { sm: "12px", md: "14px", lg: "16px" }, fontWeight: "500", fontFamily: "Poppins", color: "#9d4a49" }} >How to use Al-Saboor Portal</Typography>
                       <FlightTakeoffIcon sx={{ width: { sm: "20px", md: "20px", lg: "30px" }, height: { sm: "20px", md: "20px", lg: "30px" } }} />
 
                     </Box> */}

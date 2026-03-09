@@ -11,7 +11,7 @@ import FormCheckBox from "../../components/common/Checkbox";
 import Tooltip from '@mui/joy/Tooltip';
 import Chip from '@mui/joy/Chip';
 import AppButton from "../../components/common/AppButton";
-import { cancelBooking, getAllBookings, getFlightBooking, issueTicket, refundFlight, resendOtp, viewItinary, voidFlight } from "../../server/api";
+import { cancelBooking, getAllBookings, getFlightBooking, issueTicket, refundFlight, resendOtp, viewItinary, voidFlight, hititCancelBooking, hititVoidTicket } from "../../server/api";
 import { useDispatch, useSelector } from "react-redux";
 import { useSnackbar } from "notistack";
 import { formatDate } from "../../components/utils";
@@ -246,7 +246,17 @@ const FlightBooking = () => {
         res = await refundFlight(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
         statusName = 'Refunded'
       } else if (flight?.status === "hold") {
-        res = await cancelBooking(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights')
+        if (flight?.api?.toLowerCase() === 'hitit') {
+          const cancelBody = {
+            orderId: flight?.id,
+            action: "COMMIT",
+            ownerCode: "PK",
+            currency: "PKR"
+          };
+          res = await hititCancelBooking(cancelBody);
+        } else {
+          res = await cancelBooking(flight?.id, flight?.api === 'Sabre' ? 'sabre' : 'flights');
+        }
         statusName = 'Cancelled'
       } else {
         enqueueSnackbar('Flight Status are not available', { variant: "error" });
@@ -513,7 +523,7 @@ const FlightBooking = () => {
                     </td> */}
                     <td style={{ textAlign: 'center', cursor: 'pointer', display: 'flex', justifyContent: row.id ? 'space-between' : 'center', alignItems: 'center' }}>
                       <Tooltip title={row._id} variant="solid" sx={{ marginRight: '10px' }}>
-                        <span>{truncateString(row._id, 10)}</span>
+                        <span>{row._id?.slice(-6)}</span>
                       </Tooltip>
                       <ContentCopyIcon sx={{ marginLeft: '10x', cursor: 'pointer' }} onClick={() => copyToClipboard(row._id, 'Booking ID')} />
                     </td>

@@ -51,7 +51,7 @@ const CustomerLedgerPDF = ({ ledgerData, startDate, endDate, totalCredited, tota
          <Page size="A3" >
 
             <View style={{ width: "100%", height: "175px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px" }}>
-               <Text style={{ fontWeight: "800", fontSize: "20px" }}> INNOVATION TECH TRAVEL AND TOURISM</Text>
+               <Text style={{ fontWeight: "800", fontSize: "20px" }}> Al-Saboor TRAVEL AND TOURISM</Text>
                <Text style={{ fontWeight: "800", fontSize: "16px" }}> OPP, HAZVARD GRAMMER SCHOOL, KUTCHERY ROAD, SIALKOT, PAKISTAN</Text>
                <Text style={{ fontWeight: "800", fontSize: "12px" }}> 052-4268155-56-57</Text>
                <Text style={{ fontWeight: "800", fontSize: "12px" }}> NTN: 3246536-0</Text>
@@ -63,7 +63,7 @@ const CustomerLedgerPDF = ({ ledgerData, startDate, endDate, totalCredited, tota
                <View style={{ width: "97%", height: "auto", display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
                   <View style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", width: "45%", height: "70px" }}>
                      <View style={{ width: "50%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "5px" }}>
-                        <Text style={{ fontSize: "12px" }}>Customer: INNOVATION TECH </Text>
+                        <Text style={{ fontSize: "12px" }}>Customer: Al-Saboor </Text>
                         <Text style={{ fontSize: "12px" }}>Account: 000000000000896</Text>
                      </View>
 

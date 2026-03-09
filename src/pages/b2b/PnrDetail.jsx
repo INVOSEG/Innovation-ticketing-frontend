@@ -295,7 +295,7 @@ const Navbar = () => {
                 <Box sx={{ width: "49%", height: "90%", display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <Box sx={{ height: "70%", width: "95%", display: "flex" }}>
                         <Box sx={{ width: "80%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                            <Typography sx={{ fontSize: "26px", fontWeight: "700" }}>INNOVATION TECH TRAVEL</Typography>
+                            <Typography sx={{ fontSize: "26px", fontWeight: "700" }}>Al-Saboor TRAVEL</Typography>
                             {showAgent && (<Typography sx={{ fontSize: "22px" }}>Agent Code: 00663</Typography>)}
                         </Box>
                         <Box sx={{ width: "20%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
